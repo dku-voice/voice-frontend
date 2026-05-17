@@ -1,38 +1,141 @@
 .App {
+  font-family: 'Noto Sans KR', sans-serif;
   text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
   min-height: 100vh;
+  padding: 16px;
+  background: #f7f7f7;
+  color: #111;
+}
+
+.high-contrast {
+  background: #000;
+  color: #fff;
+}
+
+.high-contrast button {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+
+.top-bar {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  flex-wrap: wrap;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+button {
+  border: 1px solid #333;
+  background: #fff;
+  color: #111;
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button.primary {
+  background: #0078d4;
   color: white;
+  border-color: #0078d4;
 }
 
-.App-link {
-  color: #61dafb;
+button:hover {
+  opacity: 0.9;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
+.screen {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+  text-align: left;
+}
+
+.status,
+.message,
+.hint,
+.error {
+  margin: 10px 0;
+}
+
+.status {
+  font-weight: bold;
+}
+
+.error {
+  color: #b00020;
+}
+
+.hint {
+  color: #d97706;
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.category-list,
+.cart-list,
+.recommendation-list,
+.kds-list,
+.audit-list {
+  display: grid;
+  gap: 14px;
+}
+
+.category-card,
+.item-card,
+.cart-item,
+.recommendation-card,
+.kds-card,
+.audit-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.high-contrast .category-card,
+.high-contrast .item-card,
+.high-contrast .cart-item,
+.high-contrast .recommendation-card,
+.high-contrast .kds-card,
+.high-contrast .audit-card {
+  background: #111;
+  border-color: #fff;
+}
+
+.item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading {
+  position: fixed;
+  left: 50%;
+  top: 28px;
+  transform: translateX(-50%);
+  background: #222;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 20px;
+  z-index: 1000;
+}
+
+@media (max-width: 640px) {
+  .top-bar,
+  .action-row {
+    flex-direction: column;
   }
 }
