@@ -77,10 +77,14 @@ function App() {
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [snapshotStatus, setSnapshotStatus] = useState('대기 중');
   const [paymentStatus, setPaymentStatus] = useState('결제 위젯을 준비하지 않았습니다.');
+  const [paymentError, setPaymentError] = useState('');
+  const [isPaymentWidgetLoading, setIsPaymentWidgetLoading] = useState(false);
+  const [isPaymentWidgetReady, setIsPaymentWidgetReady] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const videoRef = useRef(null);
+  const paymentWidgetRef = useRef(null);
   const workerRef = useRef(null);
   const wsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
@@ -448,18 +452,51 @@ function App() {
     }
 
     try {
-      setLoading(true);
+      setPaymentError('');
+      setIsPaymentWidgetReady(false);
+      setIsPaymentWidgetLoading(true);
       setPaymentStatus('토스페이먼츠 결제 위젯을 불러오는 중입니다.');
+
+      document.querySelector('#payment-widget')?.replaceChildren();
+      document.querySelector('#agreement-widget')?.replaceChildren();
+
       const paymentWidget = await loadPaymentWidget(
         'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq',
-        'payment-widget',
+        `voice-kiosk-${Date.now()}`,
       );
+
+      paymentWidgetRef.current = paymentWidget;
       paymentWidget.renderPaymentMethods('#payment-widget', totalPrice);
+      paymentWidget.renderAgreement?.('#agreement-widget');
+      setIsPaymentWidgetReady(true);
       setPaymentStatus('결제 수단을 선택한 뒤 결제 요청을 진행할 수 있습니다.');
-    } catch {
-      setPaymentStatus('결제 위젯을 불러오지 못했습니다. 테스트 키와 네트워크 상태를 확인하세요.');
+    } catch (err) {
+      console.error(err);
+      setIsPaymentWidgetReady(false);
+      setPaymentStatus('결제 위젯을 불러오지 못했습니다.');
+      setPaymentError('SDK 스크립트 로드, 테스트 클라이언트 키, 네트워크 상태를 확인해 주세요.');
     } finally {
-      setLoading(false);
+      setIsPaymentWidgetLoading(false);
+    }
+  };
+
+  const requestTossPayment = async () => {
+    if (!paymentWidgetRef.current || !cart.length) return;
+
+    try {
+      setPaymentError('');
+      setPaymentStatus('결제 승인 화면으로 이동합니다.');
+      await paymentWidgetRef.current.requestPayment({
+        orderId: `voice-order-${Date.now()}`,
+        orderName: cart.length === 1 ? cart[0].name : `${cart[0].name} 외 ${cart.length - 1}건`,
+        successUrl: `${window.location.origin}/success`,
+        failUrl: `${window.location.origin}/fail`,
+        customerName: '키오스크 고객',
+      });
+    } catch (err) {
+      console.error(err);
+      setPaymentStatus('결제 요청을 완료하지 못했습니다.');
+      setPaymentError('결제창이 차단되었거나 위젯 선택이 완료되지 않았을 수 있습니다.');
     }
   };
 
@@ -613,10 +650,29 @@ function App() {
         <strong>{formatPrice(totalPrice)}</strong>
       </div>
       <p>{paymentStatus}</p>
-      <div id="payment-widget" className="payment-widget" />
+      {paymentError && <p className="error">{paymentError}</p>}
+      <div className="payment-shell">
+        {isPaymentWidgetLoading && (
+          <div className="payment-placeholder">
+            결제 위젯을 불러오는 중입니다. 잠시만 기다려 주세요.
+          </div>
+        )}
+        {!isPaymentWidgetLoading && !isPaymentWidgetReady && (
+          <div className="payment-placeholder">
+            아래 버튼을 누르면 토스페이먼츠 SDK 결제수단 UI가 이 영역에 표시됩니다.
+          </div>
+        )}
+        <div id="payment-widget" className="payment-widget" />
+        <div id="agreement-widget" className="payment-widget agreement-widget" />
+      </div>
       <div className="action-row">
         <button onClick={() => setCurrentScreen('cart')}>장바구니로 돌아가기</button>
-        <button onClick={handlePayment}>결제 위젯 불러오기</button>
+        <button disabled={!cart.length || isPaymentWidgetLoading} onClick={handlePayment}>
+          결제 위젯 불러오기
+        </button>
+        <button className="primary" disabled={!isPaymentWidgetReady} onClick={requestTossPayment}>
+          SDK 결제 요청
+        </button>
         <button className="primary" disabled={!cart.length} onClick={completeDemoPayment}>데모 결제 완료</button>
       </div>
     </main>
