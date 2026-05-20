@@ -247,6 +247,23 @@ button.active {
   padding: 16px;
 }
 
+.payment-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.payment-placeholder {
+  background: #eef6f5;
+  border: 1px solid #b8d8d4;
+  border-radius: 8px;
+  color: #17413d;
+  padding: 14px 16px;
+}
+
+.agreement-widget {
+  min-height: 72px;
+}
+
 .age-result {
   background: #fff;
   border: 1px solid #d8dee6;
@@ -293,6 +310,12 @@ button.active {
 
 .high-contrast .hint {
   background: #231f00;
+  border-color: #ffe66d;
+  color: #ffe66d;
+}
+
+.high-contrast .payment-placeholder {
+  background: #111;
   border-color: #ffe66d;
   color: #ffe66d;
 }
