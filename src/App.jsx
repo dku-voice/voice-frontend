@@ -461,7 +461,7 @@ function App() {
       document.querySelector('#agreement-widget')?.replaceChildren();
 
       const paymentWidget = await loadPaymentWidget(
-        'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq',
+        'test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm',
         `voice-kiosk-${Date.now()}`,
       );
 
