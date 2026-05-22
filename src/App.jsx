@@ -69,6 +69,7 @@ function App() {
   const [message, setMessage] = useState('환영합니다. 음성 또는 화면 터치로 주문을 시작하세요.');
   const [error, setError] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [noiseEngine, setNoiseEngine] = useState('대기 중');
   const [loading, setLoading] = useState(false);
   const [responseDelayTriggered, setResponseDelayTriggered] = useState(false);
   const [needSnapshotTouch, setNeedSnapshotTouch] = useState(false);
@@ -81,7 +82,9 @@ function App() {
   const [isPaymentWidgetLoading, setIsPaymentWidgetLoading] = useState(false);
   const [isPaymentWidgetReady, setIsPaymentWidgetReady] = useState(false);
 
-  const mediaRecorderRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const sourceNodeRef = useRef(null);
+  const workletNodeRef = useRef(null);
   const streamRef = useRef(null);
   const videoRef = useRef(null);
   const paymentWidgetRef = useRef(null);
@@ -107,10 +110,18 @@ function App() {
   );
 
   useEffect(() => {
-    workerRef.current = new Worker(new URL('./worker.js', import.meta.url));
+    workerRef.current = new Worker(new URL('./worker.js', import.meta.url), {
+      type: 'module',
+    });
     workerRef.current.onmessage = (event) => {
-      if (event.data?.type === 'noise-reduced') {
-        sendAudioToServer(event.data.buffer);
+      const data = event.data;
+      if (data?.type === 'engine-ready') {
+        setNoiseEngine(data.engine === 'wasm' ? 'WASM 모듈' : 'JS 폴백');
+        return;
+      }
+      if (data?.type === 'noise-reduced') {
+        setNoiseEngine(data.engine === 'wasm' ? 'WASM 모듈' : 'JS 폴백');
+        sendAudioToServer(data.pcm);
       }
     };
 
@@ -252,31 +263,70 @@ function App() {
 
   const startVoiceStreaming = async () => {
     try {
-      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true, // 브라우저 AEC: 에코 루프 방지
+          noiseSuppression: false, // 노이즈 캔슬링은 WASM 모듈이 담당
+          autoGainControl: true,
+        },
+      });
       streamRef.current = audioStream;
-      const mediaRecorder = new MediaRecorder(audioStream);
-      mediaRecorderRef.current = mediaRecorder;
 
-      mediaRecorder.ondataavailable = async (event) => {
-        if (!event.data.size) return;
-        const buffer = await event.data.arrayBuffer();
-        workerRef.current?.postMessage({ type: 'reduce-noise', buffer }, [buffer]);
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      let audioContext;
+      try {
+        audioContext = new AudioCtx({ sampleRate: 16000 });
+      } catch {
+        audioContext = new AudioCtx();
+      }
+      audioContextRef.current = audioContext;
+      if (audioContext.state === 'suspended') await audioContext.resume();
+
+      const { sampleRate } = audioContext;
+      workerRef.current?.postMessage({ type: 'configure', sampleRate });
+
+      // AudioWorklet: 마이크 원시 PCM(Float32)을 프레임 단위로 캡처
+      await audioContext.audioWorklet.addModule('/pcm-capture-processor.js');
+
+      const source = audioContext.createMediaStreamSource(audioStream);
+      const workletNode = new AudioWorkletNode(audioContext, 'pcm-capture-processor', {
+        processorOptions: { frameSize: 4096 },
+      });
+      sourceNodeRef.current = source;
+      workletNodeRef.current = workletNode;
+
+      // 캡처된 PCM 프레임 -> Web Worker(WASM 노이즈 캔슬링) -> AI 서버
+      workletNode.port.onmessage = (event) => {
+        const frame = event.data;
+        workerRef.current?.postMessage({ type: 'reduce-noise', pcm: frame }, [frame.buffer]);
       };
 
-      mediaRecorder.start(400);
+      source.connect(workletNode);
+      workletNode.connect(audioContext.destination); // 무음 출력, 그래프 활성 유지
+
       setIsRecording(true);
       setError('');
       speak('음성 인식을 시작했습니다. 원하는 메뉴를 말씀해 주세요.');
     } catch {
+      stopVoiceStreaming(false);
       setError('마이크 권한이 필요합니다. 브라우저 권한을 허용한 뒤 다시 시도하세요.');
       speak('마이크 권한이 필요합니다.');
     }
   };
 
   const stopVoiceStreaming = (announce = true) => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
+    if (workletNodeRef.current) {
+      workletNodeRef.current.port.onmessage = null;
+      workletNodeRef.current.disconnect();
+      workletNodeRef.current = null;
     }
+    sourceNodeRef.current?.disconnect();
+    sourceNodeRef.current = null;
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close();
+    }
+    audioContextRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     setIsRecording(false);
@@ -539,6 +589,7 @@ function App() {
         AI 서버: {statusLabel[wsStatus]} {retryCount > 0 && `(재연결 ${retryCount}/5)`}
       </div>
       <div>TTS 안내: {ttsEnabled ? '켜짐' : '꺼짐'}</div>
+      <div>노이즈 캔슬링: {noiseEngine}</div>
       <div>스냅샷: {snapshotStatus}</div>
       {responseDelayTriggered && <strong>응답 지연 감지됨</strong>}
     </section>
