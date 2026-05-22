@@ -71,6 +71,7 @@ function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [noiseEngine, setNoiseEngine] = useState('대기 중');
   const [loading, setLoading] = useState(false);
+  const [aiResponsePending, setAiResponsePending] = useState(false);
   const [responseDelayTriggered, setResponseDelayTriggered] = useState(false);
   const [needSnapshotTouch, setNeedSnapshotTouch] = useState(false);
   const [ageEstimate, setAgeEstimate] = useState(null);
@@ -92,6 +93,9 @@ function App() {
   const wsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const responseTimeoutRef = useRef(null);
+  const responseLoadingTimerRef = useRef(null);
+  const ttsActiveRef = useRef(false);
+  const ttsUtteranceRef = useRef(null);
   const lastAudioHashRef = useRef('');
 
   const totalPrice = useMemo(
@@ -133,6 +137,7 @@ function App() {
       wsRef.current?.close();
       clearTimeout(reconnectTimerRef.current);
       clearTimeout(responseTimeoutRef.current);
+      clearTimeout(responseLoadingTimerRef.current);
       window.speechSynthesis?.cancel();
     };
   }, []);
@@ -163,13 +168,48 @@ function App() {
     ]);
   };
 
+  // 에코 루프 방지: TTS 안내 멘트 재생 구간에는 마이크 캡처를 멈춰
+  // 키오스크 스피커 출력이 마이크로 재유입되는 것을 차단하고, 재생 후 재개한다.
+  //  - 캡처 트랙을 비활성화해 AudioWorklet 이 무음만 받도록 하고
+  //  - 캡처 프레임 전달 게이트(ttsActiveRef)로 한 번 더 차단한다.
+  const pauseMicForTts = () => {
+    ttsActiveRef.current = true;
+    streamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = false;
+    });
+  };
+
+  const resumeMicAfterTts = () => {
+    ttsActiveRef.current = false;
+    streamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = true;
+    });
+  };
+
   const speak = (text) => {
     setMessage(text);
-    if (!ttsEnabled || !('speechSynthesis' in window)) return;
+    if (!ttsEnabled || !('speechSynthesis' in window)) {
+      // TTS 미사용 시에도 직전 재생으로 멈춰 둔 마이크는 복구한다.
+      resumeMicAfterTts();
+      return;
+    }
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ko-KR';
+
+    utterance.onstart = () => pauseMicForTts();
+    const handleSpeechEnd = () => {
+      // 최신 멘트의 종료 이벤트일 때만 재개해, 연속 호출 시 조기 재개를 막는다.
+      if (ttsUtteranceRef.current === utterance) {
+        ttsUtteranceRef.current = null;
+        resumeMicAfterTts();
+      }
+    };
+    utterance.onend = handleSpeechEnd;
+    utterance.onerror = handleSpeechEnd;
+
+    ttsUtteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
   };
 
@@ -244,9 +284,20 @@ function App() {
     }
   };
 
+  // AI 서버 응답 지연 2단계 피드백
+  //   3초 초과 -> 로딩 피드백 표시 (사용자에게 처리 중임을 알림)
+  //   5초 초과 -> 터치 스냅샷 모드 전환 (오류 확인용 스냅샷 유도)
   const startResponseDelayTimer = () => {
+    clearTimeout(responseLoadingTimerRef.current);
     clearTimeout(responseTimeoutRef.current);
+    setAiResponsePending(false);
     setResponseDelayTriggered(false);
+
+    responseLoadingTimerRef.current = window.setTimeout(() => {
+      setAiResponsePending(true);
+      addAuditLog('AI 응답 지연', '3초 초과, 로딩 피드백 표시');
+    }, 3000);
+
     responseTimeoutRef.current = window.setTimeout(() => {
       setResponseDelayTriggered(true);
       setNeedSnapshotTouch(true);
@@ -256,7 +307,9 @@ function App() {
   };
 
   const clearResponseDelay = () => {
+    clearTimeout(responseLoadingTimerRef.current);
     clearTimeout(responseTimeoutRef.current);
+    setAiResponsePending(false);
     setResponseDelayTriggered(false);
     setNeedSnapshotTouch(false);
   };
@@ -298,6 +351,8 @@ function App() {
 
       // 캡처된 PCM 프레임 -> Web Worker(WASM 노이즈 캔슬링) -> AI 서버
       workletNode.port.onmessage = (event) => {
+        // 에코 루프 방지: TTS 안내 멘트 재생 중 캡처된 프레임은 전송하지 않는다.
+        if (ttsActiveRef.current) return;
         const frame = event.data;
         workerRef.current?.postMessage({ type: 'reduce-noise', pcm: frame }, [frame.buffer]);
       };
@@ -591,6 +646,9 @@ function App() {
       <div>TTS 안내: {ttsEnabled ? '켜짐' : '꺼짐'}</div>
       <div>노이즈 캔슬링: {noiseEngine}</div>
       <div>스냅샷: {snapshotStatus}</div>
+      {aiResponsePending && !responseDelayTriggered && (
+        <span className="pending-tag">AI 응답 대기 중…</span>
+      )}
       {responseDelayTriggered && <strong>응답 지연 감지됨</strong>}
     </section>
   );
@@ -807,6 +865,12 @@ function App() {
       {renderTopBar()}
       {renderSystemPanel()}
       {loading && <div className="loading">처리 중...</div>}
+      {aiResponsePending && (
+        <div className="loading ai-pending" role="status" aria-live="polite">
+          <span className="loading-spinner" aria-hidden="true" />
+          AI가 주문을 인식하고 있어요…
+        </div>
+      )}
       {currentScreen === 'menu' && renderMenu()}
       {currentScreen === 'cart' && renderCart()}
       {currentScreen === 'recommendations' && renderRecommendations()}
