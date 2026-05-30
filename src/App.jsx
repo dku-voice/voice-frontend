@@ -7,29 +7,40 @@ const API_BASE_URL = 'http://localhost:8000';
 
 const menuCatalog = [
   {
-    id: 'coffee',
-    name: '커피',
+    id: 'burger',
+    name: '버거',
     items: [
-      { id: 'americano', name: '아메리카노', price: 3000, tags: ['coffee', 'basic'], image: '☕' },
-      { id: 'latte', name: '카페라떼', price: 4000, tags: ['coffee', 'milk'], image: '🥛' },
-      { id: 'cappuccino', name: '카푸치노', price: 4500, tags: ['coffee', 'milk'], image: '☁' },
+      { id: 'classic-burger', name: '클래식 버거', price: 5900, tags: ['burger', 'beef'], image: '🍔' },
+      { id: 'cheese-burger', name: '치즈 버거', price: 6900, tags: ['burger', 'cheese'], image: '🧀' },
+      { id: 'bulgogi-burger', name: '불고기 버거', price: 6500, tags: ['burger', 'bulgogi'], image: '🍔' },
+      { id: 'bacon-cheese-burger', name: '베이컨 치즈 버거', price: 7900, tags: ['burger', 'bacon', 'cheese'], image: '🥓' },
+      { id: 'double-bulgogi-burger', name: '더블 불고기 버거', price: 8500, tags: ['burger', 'bulgogi', 'double'], image: '🍔' },
+      { id: 'steak-burger', name: '스테이크 버거', price: 9900, tags: ['burger', 'steak'], image: '🥩' },
+      { id: 'chicken-burger', name: '치킨 버거', price: 6500, tags: ['burger', 'chicken'], image: '🍗' },
     ],
   },
   {
-    id: 'dessert',
-    name: '디저트',
+    id: 'side',
+    name: '사이드',
     items: [
-      { id: 'cookie', name: '쿠키', price: 2000, tags: ['dessert', 'sweet'], image: '🍪' },
-      { id: 'cake', name: '케이크', price: 5000, tags: ['dessert', 'sweet'], image: '🍰' },
-      { id: 'muffin', name: '머핀', price: 2500, tags: ['dessert', 'bread'], image: '🧁' },
+      { id: 'fries', name: '감자튀김', price: 2500, tags: ['side', 'potato'], image: '🍟' },
+      { id: 'nuggets', name: '치킨너겟', price: 3500, tags: ['side', 'chicken'], image: '🍗' },
+      { id: 'onion-rings', name: '어니언링', price: 3200, tags: ['side', 'fried'], image: '🧅' },
+      { id: 'cheese-sticks', name: '치즈스틱', price: 3300, tags: ['side', 'cheese'], image: '🧀' },
+      { id: 'crispy-tender', name: '크리스피 텐더', price: 4200, tags: ['side', 'chicken'], image: '🍗' },
     ],
   },
   {
     id: 'drink',
     name: '음료',
     items: [
-      { id: 'juice', name: '오렌지 주스', price: 3500, tags: ['cold', 'fruit'], image: '🍊' },
-      { id: 'smoothie', name: '딸기 스무디', price: 4000, tags: ['cold', 'fruit'], image: '🍓' },
+      { id: 'cola', name: '콜라', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
+      { id: 'zero-cola', name: '제로 콜라', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
+      { id: 'lemonade', name: '레모네이드', price: 3000, tags: ['drink', 'fresh'], image: '🍋' },
+      { id: 'sprite', name: '스프라이트', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
+      { id: 'zero-sprite', name: '제로 스프라이트', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
+      { id: 'orange-fanta', name: '오렌지 환타', price: 2000, tags: ['drink', 'soda'], image: '🍊' },
+      { id: 'grape-fanta', name: '포도 환타', price: 2000, tags: ['drink', 'soda'], image: '🍇' },
     ],
   },
 ];
@@ -37,9 +48,9 @@ const menuCatalog = [
 const allMenuItems = menuCatalog.flatMap((category) => category.items);
 
 const initialKdsOrders = [
-  { id: 'KDS-001', menu: '아메리카노 외 1건', qty: 2, status: '조리 대기', createdAt: '10:12' },
-  { id: 'KDS-002', menu: '카페라떼', qty: 1, status: '조리 중', createdAt: '10:18' },
-  { id: 'KDS-003', menu: '쿠키 세트', qty: 3, status: '완료 대기', createdAt: '10:24' },
+  { id: 'KDS-001', menu: '더블 불고기 버거 세트', qty: 2, status: '조리 대기', createdAt: '10:12' },
+  { id: 'KDS-002', menu: '베이컨 치즈 버거', qty: 1, status: '조리 중', createdAt: '10:18' },
+  { id: 'KDS-003', menu: '치즈스틱 세트', qty: 3, status: '완료 대기', createdAt: '10:24' },
 ];
 
 const initialAuditLogs = [
@@ -97,6 +108,7 @@ function App() {
   const ttsActiveRef = useRef(false);
   const ttsUtteranceRef = useRef(null);
   const lastAudioHashRef = useRef('');
+  const snapshotCaptureInProgressRef = useRef(false);
 
   const totalPrice = useMemo(
     () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -435,16 +447,23 @@ function App() {
 
   const buildRecommendations = (cartItems) => {
     if (!cartItems.length) {
-      return allMenuItems.filter((item) => ['latte', 'cookie', 'juice'].includes(item.id));
+      return allMenuItems.filter((item) => ['cheese-burger', 'fries', 'cola'].includes(item.id));
     }
 
     const cartIds = new Set(cartItems.map((item) => item.id));
     const rules = [
-      { when: ['americano'], then: 'cookie', confidence: 0.82 },
-      { when: ['latte'], then: 'cake', confidence: 0.76 },
-      { when: ['cookie'], then: 'latte', confidence: 0.71 },
-      { when: ['juice'], then: 'muffin', confidence: 0.68 },
-      { when: ['smoothie'], then: 'cake', confidence: 0.74 },
+      { when: ['classic-burger'], then: 'fries', confidence: 0.82 },
+      { when: ['cheese-burger'], then: 'cola', confidence: 0.78 },
+      { when: ['bulgogi-burger'], then: 'sprite', confidence: 0.77 },
+      { when: ['bacon-cheese-burger'], then: 'onion-rings', confidence: 0.76 },
+      { when: ['double-bulgogi-burger'], then: 'cheese-sticks', confidence: 0.79 },
+      { when: ['steak-burger'], then: 'crispy-tender', confidence: 0.81 },
+      { when: ['chicken-burger'], then: 'nuggets', confidence: 0.74 },
+      { when: ['fries', 'nuggets'], then: 'zero-cola', confidence: 0.71 },
+      { when: ['cheese-sticks', 'crispy-tender'], then: 'zero-sprite', confidence: 0.72 },
+      { when: ['cola', 'zero-cola'], then: 'fries', confidence: 0.68 },
+      { when: ['sprite', 'zero-sprite'], then: 'cheese-sticks', confidence: 0.66 },
+      { when: ['orange-fanta', 'grape-fanta'], then: 'crispy-tender', confidence: 0.65 },
     ];
 
     return rules
@@ -457,10 +476,14 @@ function App() {
   };
 
   const captureSnapshot = async () => {
+    if (snapshotCaptureInProgressRef.current) return;
+
+    let videoStream;
     try {
+      snapshotCaptureInProgressRef.current = true;
       setLoading(true);
       setSnapshotStatus('카메라 준비 중');
-      const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
 
       if (!videoRef.current) return;
       videoRef.current.srcObject = videoStream;
@@ -488,12 +511,26 @@ function App() {
       speak('오류 확인용 스냅샷을 전송했습니다.');
       addAuditLog('스냅샷 전송', 'AI 서버 지연 상황 캡처 완료');
       clearResponseDelay();
-      videoStream.getTracks().forEach((track) => track.stop());
-    } catch {
-      setSnapshotStatus('전송 실패');
-      setError('카메라 권한 또는 AI 서버 연결을 확인해 주세요.');
-      speak('스냅샷 전송에 실패했습니다.');
+    } catch (err) {
+      setNeedSnapshotTouch(false);
+      setAiResponsePending(false);
+      setResponseDelayTriggered(false);
+
+      const isPermissionDenied =
+        err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
+
+      if (isPermissionDenied) {
+        setSnapshotStatus('카메라 권한 거부됨');
+        setError('카메라 권한이 거부되어 자동 스냅샷 요청을 중지했습니다.');
+        speak('카메라 권한이 거부되어 스냅샷 요청을 중지했습니다.');
+      } else {
+        setSnapshotStatus('전송 실패');
+        setError('카메라 권한 또는 AI 서버 연결을 확인해 주세요.');
+        speak('스냅샷 전송에 실패했습니다.');
+      }
     } finally {
+      videoStream?.getTracks().forEach((track) => track.stop());
+      snapshotCaptureInProgressRef.current = false;
       setLoading(false);
     }
   };
