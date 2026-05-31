@@ -7,29 +7,40 @@ const API_BASE_URL = 'http://localhost:8000';
 
 const menuCatalog = [
   {
-    id: 'coffee',
-    name: '커피',
+    id: 'burger',
+    name: '버거',
     items: [
-      { id: 'americano', name: '아메리카노', price: 3000, tags: ['coffee', 'basic'], image: '☕' },
-      { id: 'latte', name: '카페라떼', price: 4000, tags: ['coffee', 'milk'], image: '🥛' },
-      { id: 'cappuccino', name: '카푸치노', price: 4500, tags: ['coffee', 'milk'], image: '☁' },
+      { id: 'classic-burger', name: '클래식 버거', price: 5900, tags: ['burger', 'beef'], image: '🍔' },
+      { id: 'cheese-burger', name: '치즈 버거', price: 6900, tags: ['burger', 'cheese'], image: '🧀' },
+      { id: 'bulgogi-burger', name: '불고기 버거', price: 6500, tags: ['burger', 'bulgogi'], image: '🍔' },
+      { id: 'bacon-cheese-burger', name: '베이컨 치즈 버거', price: 7900, tags: ['burger', 'bacon', 'cheese'], image: '🥓' },
+      { id: 'double-bulgogi-burger', name: '더블 불고기 버거', price: 8500, tags: ['burger', 'bulgogi', 'double'], image: '🍔' },
+      { id: 'steak-burger', name: '스테이크 버거', price: 9900, tags: ['burger', 'steak'], image: '🥩' },
+      { id: 'chicken-burger', name: '치킨 버거', price: 6500, tags: ['burger', 'chicken'], image: '🍗' },
     ],
   },
   {
-    id: 'dessert',
-    name: '디저트',
+    id: 'side',
+    name: '사이드',
     items: [
-      { id: 'cookie', name: '쿠키', price: 2000, tags: ['dessert', 'sweet'], image: '🍪' },
-      { id: 'cake', name: '케이크', price: 5000, tags: ['dessert', 'sweet'], image: '🍰' },
-      { id: 'muffin', name: '머핀', price: 2500, tags: ['dessert', 'bread'], image: '🧁' },
+      { id: 'fries', name: '감자튀김', price: 2500, tags: ['side', 'potato'], image: '🍟' },
+      { id: 'nuggets', name: '치킨너겟', price: 3500, tags: ['side', 'chicken'], image: '🍗' },
+      { id: 'onion-rings', name: '어니언링', price: 3200, tags: ['side', 'fried'], image: '🧅' },
+      { id: 'cheese-sticks', name: '치즈스틱', price: 3300, tags: ['side', 'cheese'], image: '🧀' },
+      { id: 'crispy-tender', name: '크리스피 텐더', price: 4200, tags: ['side', 'chicken'], image: '🍗' },
     ],
   },
   {
     id: 'drink',
     name: '음료',
     items: [
-      { id: 'juice', name: '오렌지 주스', price: 3500, tags: ['cold', 'fruit'], image: '🍊' },
-      { id: 'smoothie', name: '딸기 스무디', price: 4000, tags: ['cold', 'fruit'], image: '🍓' },
+      { id: 'cola', name: '콜라', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
+      { id: 'zero-cola', name: '제로 콜라', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
+      { id: 'lemonade', name: '레모네이드', price: 3000, tags: ['drink', 'fresh'], image: '🍋' },
+      { id: 'sprite', name: '스프라이트', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
+      { id: 'zero-sprite', name: '제로 스프라이트', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
+      { id: 'orange-fanta', name: '오렌지 환타', price: 2000, tags: ['drink', 'soda'], image: '🍊' },
+      { id: 'grape-fanta', name: '포도 환타', price: 2000, tags: ['drink', 'soda'], image: '🍇' },
     ],
   },
 ];
@@ -37,9 +48,9 @@ const menuCatalog = [
 const allMenuItems = menuCatalog.flatMap((category) => category.items);
 
 const initialKdsOrders = [
-  { id: 'KDS-001', menu: '아메리카노 외 1건', qty: 2, status: '조리 대기', createdAt: '10:12' },
-  { id: 'KDS-002', menu: '카페라떼', qty: 1, status: '조리 중', createdAt: '10:18' },
-  { id: 'KDS-003', menu: '쿠키 세트', qty: 3, status: '완료 대기', createdAt: '10:24' },
+  { id: 'KDS-001', menu: '더블 불고기 버거 세트', qty: 2, status: '조리 대기', createdAt: '10:12' },
+  { id: 'KDS-002', menu: '베이컨 치즈 버거', qty: 1, status: '조리 중', createdAt: '10:18' },
+  { id: 'KDS-003', menu: '치즈스틱 세트', qty: 3, status: '완료 대기', createdAt: '10:24' },
 ];
 
 const initialAuditLogs = [
@@ -69,7 +80,9 @@ function App() {
   const [message, setMessage] = useState('환영합니다. 음성 또는 화면 터치로 주문을 시작하세요.');
   const [error, setError] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [noiseEngine, setNoiseEngine] = useState('대기 중');
   const [loading, setLoading] = useState(false);
+  const [aiResponsePending, setAiResponsePending] = useState(false);
   const [responseDelayTriggered, setResponseDelayTriggered] = useState(false);
   const [needSnapshotTouch, setNeedSnapshotTouch] = useState(false);
   const [ageEstimate, setAgeEstimate] = useState(null);
@@ -81,7 +94,9 @@ function App() {
   const [isPaymentWidgetLoading, setIsPaymentWidgetLoading] = useState(false);
   const [isPaymentWidgetReady, setIsPaymentWidgetReady] = useState(false);
 
-  const mediaRecorderRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const sourceNodeRef = useRef(null);
+  const workletNodeRef = useRef(null);
   const streamRef = useRef(null);
   const videoRef = useRef(null);
   const paymentWidgetRef = useRef(null);
@@ -89,7 +104,11 @@ function App() {
   const wsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const responseTimeoutRef = useRef(null);
+  const responseLoadingTimerRef = useRef(null);
+  const ttsActiveRef = useRef(false);
+  const ttsUtteranceRef = useRef(null);
   const lastAudioHashRef = useRef('');
+  const snapshotCaptureInProgressRef = useRef(false);
 
   const totalPrice = useMemo(
     () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -107,10 +126,18 @@ function App() {
   );
 
   useEffect(() => {
-    workerRef.current = new Worker(new URL('./worker.js', import.meta.url));
+    workerRef.current = new Worker(new URL('./worker.js', import.meta.url), {
+      type: 'module',
+    });
     workerRef.current.onmessage = (event) => {
-      if (event.data?.type === 'noise-reduced') {
-        sendAudioToServer(event.data.buffer);
+      const data = event.data;
+      if (data?.type === 'engine-ready') {
+        setNoiseEngine(data.engine === 'wasm' ? 'WASM 모듈' : 'JS 폴백');
+        return;
+      }
+      if (data?.type === 'noise-reduced') {
+        setNoiseEngine(data.engine === 'wasm' ? 'WASM 모듈' : 'JS 폴백');
+        sendAudioToServer(data.pcm);
       }
     };
 
@@ -122,6 +149,7 @@ function App() {
       wsRef.current?.close();
       clearTimeout(reconnectTimerRef.current);
       clearTimeout(responseTimeoutRef.current);
+      clearTimeout(responseLoadingTimerRef.current);
       window.speechSynthesis?.cancel();
     };
   }, []);
@@ -152,13 +180,48 @@ function App() {
     ]);
   };
 
+  // 에코 루프 방지: TTS 안내 멘트 재생 구간에는 마이크 캡처를 멈춰
+  // 키오스크 스피커 출력이 마이크로 재유입되는 것을 차단하고, 재생 후 재개한다.
+  //  - 캡처 트랙을 비활성화해 AudioWorklet 이 무음만 받도록 하고
+  //  - 캡처 프레임 전달 게이트(ttsActiveRef)로 한 번 더 차단한다.
+  const pauseMicForTts = () => {
+    ttsActiveRef.current = true;
+    streamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = false;
+    });
+  };
+
+  const resumeMicAfterTts = () => {
+    ttsActiveRef.current = false;
+    streamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = true;
+    });
+  };
+
   const speak = (text) => {
     setMessage(text);
-    if (!ttsEnabled || !('speechSynthesis' in window)) return;
+    if (!ttsEnabled || !('speechSynthesis' in window)) {
+      // TTS 미사용 시에도 직전 재생으로 멈춰 둔 마이크는 복구한다.
+      resumeMicAfterTts();
+      return;
+    }
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ko-KR';
+
+    utterance.onstart = () => pauseMicForTts();
+    const handleSpeechEnd = () => {
+      // 최신 멘트의 종료 이벤트일 때만 재개해, 연속 호출 시 조기 재개를 막는다.
+      if (ttsUtteranceRef.current === utterance) {
+        ttsUtteranceRef.current = null;
+        resumeMicAfterTts();
+      }
+    };
+    utterance.onend = handleSpeechEnd;
+    utterance.onerror = handleSpeechEnd;
+
+    ttsUtteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
   };
 
@@ -233,9 +296,20 @@ function App() {
     }
   };
 
+  // AI 서버 응답 지연 2단계 피드백
+  //   3초 초과 -> 로딩 피드백 표시 (사용자에게 처리 중임을 알림)
+  //   5초 초과 -> 터치 스냅샷 모드 전환 (오류 확인용 스냅샷 유도)
   const startResponseDelayTimer = () => {
+    clearTimeout(responseLoadingTimerRef.current);
     clearTimeout(responseTimeoutRef.current);
+    setAiResponsePending(false);
     setResponseDelayTriggered(false);
+
+    responseLoadingTimerRef.current = window.setTimeout(() => {
+      setAiResponsePending(true);
+      addAuditLog('AI 응답 지연', '3초 초과, 로딩 피드백 표시');
+    }, 3000);
+
     responseTimeoutRef.current = window.setTimeout(() => {
       setResponseDelayTriggered(true);
       setNeedSnapshotTouch(true);
@@ -245,38 +319,81 @@ function App() {
   };
 
   const clearResponseDelay = () => {
+    clearTimeout(responseLoadingTimerRef.current);
     clearTimeout(responseTimeoutRef.current);
+    setAiResponsePending(false);
     setResponseDelayTriggered(false);
     setNeedSnapshotTouch(false);
   };
 
   const startVoiceStreaming = async () => {
     try {
-      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true, // 브라우저 AEC: 에코 루프 방지
+          noiseSuppression: false, // 노이즈 캔슬링은 WASM 모듈이 담당
+          autoGainControl: true,
+        },
+      });
       streamRef.current = audioStream;
-      const mediaRecorder = new MediaRecorder(audioStream);
-      mediaRecorderRef.current = mediaRecorder;
 
-      mediaRecorder.ondataavailable = async (event) => {
-        if (!event.data.size) return;
-        const buffer = await event.data.arrayBuffer();
-        workerRef.current?.postMessage({ type: 'reduce-noise', buffer }, [buffer]);
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      let audioContext;
+      try {
+        audioContext = new AudioCtx({ sampleRate: 16000 });
+      } catch {
+        audioContext = new AudioCtx();
+      }
+      audioContextRef.current = audioContext;
+      if (audioContext.state === 'suspended') await audioContext.resume();
+
+      const { sampleRate } = audioContext;
+      workerRef.current?.postMessage({ type: 'configure', sampleRate });
+
+      // AudioWorklet: 마이크 원시 PCM(Float32)을 프레임 단위로 캡처
+      await audioContext.audioWorklet.addModule('/pcm-capture-processor.js');
+
+      const source = audioContext.createMediaStreamSource(audioStream);
+      const workletNode = new AudioWorkletNode(audioContext, 'pcm-capture-processor', {
+        processorOptions: { frameSize: 4096 },
+      });
+      sourceNodeRef.current = source;
+      workletNodeRef.current = workletNode;
+
+      // 캡처된 PCM 프레임 -> Web Worker(WASM 노이즈 캔슬링) -> AI 서버
+      workletNode.port.onmessage = (event) => {
+        // 에코 루프 방지: TTS 안내 멘트 재생 중 캡처된 프레임은 전송하지 않는다.
+        if (ttsActiveRef.current) return;
+        const frame = event.data;
+        workerRef.current?.postMessage({ type: 'reduce-noise', pcm: frame }, [frame.buffer]);
       };
 
-      mediaRecorder.start(400);
+      source.connect(workletNode);
+      workletNode.connect(audioContext.destination); // 무음 출력, 그래프 활성 유지
+
       setIsRecording(true);
       setError('');
       speak('음성 인식을 시작했습니다. 원하는 메뉴를 말씀해 주세요.');
     } catch {
+      stopVoiceStreaming(false);
       setError('마이크 권한이 필요합니다. 브라우저 권한을 허용한 뒤 다시 시도하세요.');
       speak('마이크 권한이 필요합니다.');
     }
   };
 
   const stopVoiceStreaming = (announce = true) => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
+    if (workletNodeRef.current) {
+      workletNodeRef.current.port.onmessage = null;
+      workletNodeRef.current.disconnect();
+      workletNodeRef.current = null;
     }
+    sourceNodeRef.current?.disconnect();
+    sourceNodeRef.current = null;
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close();
+    }
+    audioContextRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     setIsRecording(false);
@@ -330,16 +447,23 @@ function App() {
 
   const buildRecommendations = (cartItems) => {
     if (!cartItems.length) {
-      return allMenuItems.filter((item) => ['latte', 'cookie', 'juice'].includes(item.id));
+      return allMenuItems.filter((item) => ['cheese-burger', 'fries', 'cola'].includes(item.id));
     }
 
     const cartIds = new Set(cartItems.map((item) => item.id));
     const rules = [
-      { when: ['americano'], then: 'cookie', confidence: 0.82 },
-      { when: ['latte'], then: 'cake', confidence: 0.76 },
-      { when: ['cookie'], then: 'latte', confidence: 0.71 },
-      { when: ['juice'], then: 'muffin', confidence: 0.68 },
-      { when: ['smoothie'], then: 'cake', confidence: 0.74 },
+      { when: ['classic-burger'], then: 'fries', confidence: 0.82 },
+      { when: ['cheese-burger'], then: 'cola', confidence: 0.78 },
+      { when: ['bulgogi-burger'], then: 'sprite', confidence: 0.77 },
+      { when: ['bacon-cheese-burger'], then: 'onion-rings', confidence: 0.76 },
+      { when: ['double-bulgogi-burger'], then: 'cheese-sticks', confidence: 0.79 },
+      { when: ['steak-burger'], then: 'crispy-tender', confidence: 0.81 },
+      { when: ['chicken-burger'], then: 'nuggets', confidence: 0.74 },
+      { when: ['fries', 'nuggets'], then: 'zero-cola', confidence: 0.71 },
+      { when: ['cheese-sticks', 'crispy-tender'], then: 'zero-sprite', confidence: 0.72 },
+      { when: ['cola', 'zero-cola'], then: 'fries', confidence: 0.68 },
+      { when: ['sprite', 'zero-sprite'], then: 'cheese-sticks', confidence: 0.66 },
+      { when: ['orange-fanta', 'grape-fanta'], then: 'crispy-tender', confidence: 0.65 },
     ];
 
     return rules
@@ -352,10 +476,14 @@ function App() {
   };
 
   const captureSnapshot = async () => {
+    if (snapshotCaptureInProgressRef.current) return;
+
+    let videoStream;
     try {
+      snapshotCaptureInProgressRef.current = true;
       setLoading(true);
       setSnapshotStatus('카메라 준비 중');
-      const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
 
       if (!videoRef.current) return;
       videoRef.current.srcObject = videoStream;
@@ -383,12 +511,26 @@ function App() {
       speak('오류 확인용 스냅샷을 전송했습니다.');
       addAuditLog('스냅샷 전송', 'AI 서버 지연 상황 캡처 완료');
       clearResponseDelay();
-      videoStream.getTracks().forEach((track) => track.stop());
-    } catch {
-      setSnapshotStatus('전송 실패');
-      setError('카메라 권한 또는 AI 서버 연결을 확인해 주세요.');
-      speak('스냅샷 전송에 실패했습니다.');
+    } catch (err) {
+      setNeedSnapshotTouch(false);
+      setAiResponsePending(false);
+      setResponseDelayTriggered(false);
+
+      const isPermissionDenied =
+        err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
+
+      if (isPermissionDenied) {
+        setSnapshotStatus('카메라 권한 거부됨');
+        setError('카메라 권한이 거부되어 자동 스냅샷 요청을 중지했습니다.');
+        speak('카메라 권한이 거부되어 스냅샷 요청을 중지했습니다.');
+      } else {
+        setSnapshotStatus('전송 실패');
+        setError('카메라 권한 또는 AI 서버 연결을 확인해 주세요.');
+        speak('스냅샷 전송에 실패했습니다.');
+      }
     } finally {
+      videoStream?.getTracks().forEach((track) => track.stop());
+      snapshotCaptureInProgressRef.current = false;
       setLoading(false);
     }
   };
@@ -461,7 +603,7 @@ function App() {
       document.querySelector('#agreement-widget')?.replaceChildren();
 
       const paymentWidget = await loadPaymentWidget(
-        'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq',
+        'test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm',
         `voice-kiosk-${Date.now()}`,
       );
 
@@ -539,7 +681,11 @@ function App() {
         AI 서버: {statusLabel[wsStatus]} {retryCount > 0 && `(재연결 ${retryCount}/5)`}
       </div>
       <div>TTS 안내: {ttsEnabled ? '켜짐' : '꺼짐'}</div>
+      <div>노이즈 캔슬링: {noiseEngine}</div>
       <div>스냅샷: {snapshotStatus}</div>
+      {aiResponsePending && !responseDelayTriggered && (
+        <span className="pending-tag">AI 응답 대기 중…</span>
+      )}
       {responseDelayTriggered && <strong>응답 지연 감지됨</strong>}
     </section>
   );
@@ -756,6 +902,12 @@ function App() {
       {renderTopBar()}
       {renderSystemPanel()}
       {loading && <div className="loading">처리 중...</div>}
+      {aiResponsePending && (
+        <div className="loading ai-pending" role="status" aria-live="polite">
+          <span className="loading-spinner" aria-hidden="true" />
+          AI가 주문을 인식하고 있어요…
+        </div>
+      )}
       {currentScreen === 'menu' && renderMenu()}
       {currentScreen === 'cart' && renderCart()}
       {currentScreen === 'recommendations' && renderRecommendations()}
