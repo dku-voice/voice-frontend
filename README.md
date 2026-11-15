@@ -1,70 +1,26 @@
-# Getting Started with Create React App
+# DKU Voice 프론트엔드
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+React 18 · JavaScript · Vite 기반 음성인식 키오스크입니다. 기존 메뉴·장바구니·결제·KDS·관리자 화면에 최신 `/api` 규격을 연결합니다. 상태와 화면 전환은 `App.jsx`의 React hooks로 관리하며 별도 라우터는 사용하지 않습니다.
 
-## Available Scripts
+```sh
+npm ci
+npm run dev
+```
 
-In the project directory, you can run:
+현재 작업 환경에는 테스트 클라이언트 키가 `.env.local`에 설정되어 있습니다. 새 환경에서는 `.env.example`을 참고하여 직접 설정하세요. 시크릿 키와 계정 비밀번호는 프론트 환경변수에 넣지 않습니다.
 
-### `npm start`
+- 배포 API: `VITE_API_BASE_URL=`이면 `/api/...` 상대경로
+- 개발 프록시: `BACKEND_PROXY_TARGET=https://dku-voice.com` (로컬 백엔드 사용 시 `http://127.0.0.1:8080`)
+- 음성 연결: `VITE_AI_WS_URL=`이면 현재 host의 `/ws/audio`, HTTPS에서는 WSS
+- 사진 전송: `VITE_AI_SNAPSHOT_URL`은 기존 multipart 계약이 확인된 경우에만 설정
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```sh
+npm test
+npm run lint
+npm run build
+npm run preview
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+서버 메뉴를 불러오지 못하면 예시 메뉴를 표시하며 주문 버튼을 잠급니다. 결제는 최신 명세의 `TEST` 승인 경로를 사용합니다. 외부 토스 결제 요청 버튼은 실행하지 않으며, 기존 결제 수단 표시 영역은 유지합니다. 정상 결제 화면에 별도의 테스트·과금 안내 배너는 추가하지 않았습니다.
 
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+실제 서버 검증 상태와 파일별 변경 내용은 [연동 보고서](docs/INTEGRATION_REPORT.md), 조회 응답 기록은 [API 확인 결과](docs/API_VERIFICATION.json)를 참고하세요. 보고서에서 확인하지 않은 API를 실제 연동 완료로 간주하지 마세요.
