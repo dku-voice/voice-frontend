@@ -26,16 +26,26 @@ export const normalizeMenus = (raw) => {
     }
     ids.add(menu.menuId);
     if (menu.options != null && !Array.isArray(menu.options)) throw new Error('메뉴 옵션 형식이 올바르지 않습니다.');
-    const optionIds = new Set();
-    const options = Array.from(menu.options || [], (option) => {
+    const optionsById = new Map();
+    for (const option of menu.options || []) {
       if (!positiveInteger(option?.optionId) || !text(option.nameKo)
         || !['ADD', 'REMOVE'].includes(option.optionType) || !nonNegativeInteger(option.extraPrice)
-        || (option.optionType === 'REMOVE' && option.extraPrice !== 0) || optionIds.has(option.optionId)) {
+        || (option.optionType === 'REMOVE' && option.extraPrice !== 0)) {
         throw new Error('서버 메뉴 옵션 정보가 올바르지 않습니다.');
       }
-      optionIds.add(option.optionId);
-      return { ...option, name: text(option.nameKo), nameKo: text(option.nameKo), nameEn: text(option.nameEn) };
-    });
+      const normalized = { ...option, name: text(option.nameKo), nameKo: text(option.nameKo), nameEn: text(option.nameEn) };
+      const previous = optionsById.get(option.optionId);
+      if (previous) {
+        // A joined API response may repeat the same option. Never choose between
+        // conflicting definitions or charge twice for an identical repeated row.
+        if (['nameKo', 'nameEn', 'optionType', 'extraPrice'].some((field) => previous[field] !== normalized[field])) {
+          throw new Error('같은 옵션 ID에 서로 다른 정보가 있습니다. 메뉴 정보를 확인해 주세요.');
+        }
+        continue;
+      }
+      optionsById.set(option.optionId, normalized);
+    }
+    const options = [...optionsById.values()];
     const categoryNameKo = text(menu.categoryNameKo) || '기타';
     return {
       ...menu,

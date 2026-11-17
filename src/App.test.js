@@ -5,7 +5,7 @@ import { renderToString } from 'react-dom/server';
 import { createServer } from 'vite';
 
 // Render application JSX through the actual Vite pipeline; no browser or live APIs.
-test('기존 메뉴와 결제 화면의 구조를 유지하고 렌더만으로 주문·결제를 요청하지 않는다', async () => {
+test('기존 메뉴와 결제 영역을 유지하고 최종 결제 버튼 하나를 렌더하며 SSR에서 주문·결제를 요청하지 않는다', async () => {
   const originalWindow = globalThis.window;
   const originalFetch = globalThis.fetch;
   let calls = 0;
@@ -32,7 +32,9 @@ test('기존 메뉴와 결제 화면의 구조를 유지하고 렌더만으로 �
           assert(html.includes('연령 추정'));
           assert(!html.includes('5초 지연 테스트'));
         } else {
-          for (const label of ['장바구니로 돌아가기', '결제 위젯 불러오기', 'SDK 결제 요청', '데모 결제 완료']) assert(html.includes(label));
+          assert(html.includes('장바구니로 돌아가기'));
+          assert.equal((html.match(/>결제하기<\/button>/g) || []).length, 1);
+          for (const label of ['결제 위젯 불러오기', 'SDK 결제 요청', '데모 결제 완료']) assert(!html.includes(label));
           assert(html.includes('id="payment-widget"'));
           assert(html.includes('id="agreement-widget"'));
           assert(!html.includes('실제 과금 없음'));

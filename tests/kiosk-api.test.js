@@ -51,7 +51,7 @@ test('문자열 메뉴 ID·잘못된 수량·누락된 옵션 배열은 전송�
   await assert.rejects(api.getOrder('../payments'), { code: 'INVALID_INPUT' });
 });
 
-test('결제는 TEST/CARD만 허용하고 서버 DB ID·확정 금액·고유 거래 ID를 그대로 전송한다', async () => {
+test('TEST 결제는 CARD만 허용하고 서버 DB ID·확정 금액·고유 거래 ID를 그대로 전송한다', async () => {
   const payload = { pgProvider: 'TEST', pgTransactionId: 'unique-test-id', orderId: 42, amount: 4600, method: 'CARD' };
   let calls = 0;
   const api = apiWith(async (url, options) => {
@@ -62,10 +62,27 @@ test('결제는 TEST/CARD만 허용하고 서버 DB ID·확정 금액·고유 �
     return success({ paymentId: 9, orderId: 42, amount: 4600, pgTransactionId: payload.pgTransactionId });
   });
   assert.equal((await api.confirmPayment(payload)).paymentId, 9);
-  for (const change of [{ pgProvider: 'TOSS' }, { method: 'TOSS' }, { amount: 0 }, { orderId: '42' }, { pgTransactionId: '' }]) {
+  for (const change of [{ pgProvider: 'UNKNOWN' }, { method: 'TOSS' }, { amount: 0 }, { orderId: '42' }, { pgTransactionId: '' }]) {
     await assert.rejects(api.confirmPayment({ ...payload, ...change }), { code: 'INVALID_INPUT' });
   }
   assert.equal(calls, 1);
+});
+
+test('TOSS 승인은 paymentKey를 거래 ID로 전달하고 합의된 결제수단만 허용한다', async () => {
+  const calls = [];
+  const api = apiWith(async (url, options) => {
+    assert.equal(url, '/api/payments/confirm');
+    calls.push(JSON.parse(options.body));
+    return success({ paymentId: 10 });
+  });
+  const payload = { pgProvider: 'TOSS', pgTransactionId: 'mock-payment-key', orderId: 42, amount: 4600 };
+  for (const method of ['CARD', 'KAKAO_PAY', 'NAVER_PAY', 'TOSS']) await api.confirmPayment({ ...payload, method });
+  await api.confirmPayment(payload);
+  assert.deepEqual(calls.map((body) => body.method), ['CARD', 'KAKAO_PAY', 'NAVER_PAY', 'TOSS', 'CARD']);
+  assert.equal(calls.every((body) => body.pgProvider === 'TOSS' && body.pgTransactionId === payload.pgTransactionId
+    && body.orderId === 42 && body.amount === 4600), true);
+  for (const method of ['TRANSFER', 'PAYCO', 'CASH']) await assert.rejects(api.confirmPayment({ ...payload, method }), { code: 'INVALID_INPUT' });
+  assert.equal(calls.length, 5);
 });
 
 test('환불은 거래 ID와 취소 사유만 전달하며 응답을 원형으로 반환한다', async () => {

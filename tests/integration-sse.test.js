@@ -130,6 +130,27 @@ test('이미 취소된 signal과 잘못된 토큰은 HTTP 요청을 만들지 �
   stop();
 });
 
+test('401 응답도 기존 토큰을 전달하고 연결·재연결을 중단한다', async () => {
+  let auth;
+  let requests = 0;
+  const input = source([], { status: 401, type: 'application/json' });
+  const statuses = [];
+  const stop = openKdsStream({
+    token: 'expired-token', retryMs: 0,
+    fetchImpl: async () => { requests += 1; return input.response; },
+    onStatus: (status) => statuses.push(status), onAuthError: (value) => { auth = value; },
+  });
+  await waitFor(() => auth);
+  assert.equal(auth.status, 401);
+  assert.equal(auth.token, 'expired-token');
+  assert.equal(auth.code, 'FORBIDDEN');
+  assert.deepEqual(statuses, ['connecting', 'closed']);
+  assert.equal(input.canceled(), true);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(requests, 1);
+  stop();
+});
+
 test('실행 중 signal 취소는 reader와 재연결을 정리한다', async () => {
   const controller = new AbortController();
   const input = source([]);

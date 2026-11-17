@@ -61,6 +61,39 @@ test('알 수 없는 옵션·문자열 ID·잘못된 수량·중복 서버 메�
   assert.throws(() => buildOrderBody([{ id: 'sample-burger', quantity: 1 }]));
 });
 
+test('API가 동일 옵션을 반복해도 한 번씩만 표시·선택·과금하고 원본 응답을 변경하지 않는다', () => {
+  const repeated = structuredClone(rawMenus);
+  repeated[0].options = Array.from({ length: 7 }, () => structuredClone(rawMenus[0].options)).flat();
+  repeated[1].options = [...structuredClone(rawMenus[1].options), ...structuredClone(rawMenus[1].options)];
+  const original = structuredClone(repeated);
+  const menus = normalizeMenus(repeated);
+  assert.deepEqual(menus[0].options.map((option) => option.optionId), [10, 11]);
+  assert.equal(menus[1].options.length, 3);
+  const cart = [createCartItem(menus[0], [10, 11], 2), createCartItem(menus[1], [20])];
+  assert.equal(cart[0].unitPrice, 3300);
+  assert.equal(cart[1].unitPrice, 2000);
+  assert.deepEqual(buildOrderBody(cart), { items: [
+    { menuId: 1, quantity: 2, optionIds: [10, 11] }, { menuId: 9, quantity: 1, optionIds: [20] },
+  ] });
+  assert.deepEqual(repeated, original);
+});
+
+test('같은 옵션 ID의 이름·번역·종류·가격이 다르면 어느 값도 임의로 선택하지 않는다', () => {
+  const option = { optionId: 10, nameKo: '양파 추가', nameEn: 'Add Onion', optionType: 'ADD', extraPrice: 0 };
+  for (const difference of [
+    { nameKo: '치즈 추가' }, { nameEn: 'Add Cheese' }, { optionType: 'REMOVE' }, { extraPrice: 500 },
+  ]) {
+    assert.throws(() => normalizeMenus([{ ...rawMenus[0], options: [option, { ...option, ...difference }] }]), /서로 다른 정보/);
+  }
+});
+
+test('반복된 옵션이어도 잘못된 가격·종류·이름·문자열 ID는 계속 거부한다', () => {
+  const option = rawMenus[0].options[0];
+  for (const difference of [{ extraPrice: -1 }, { optionType: 'UNKNOWN' }, { nameKo: '' }, { optionId: '10' }]) {
+    assert.throws(() => normalizeMenus([{ ...rawMenus[0], options: [option, { ...option, ...difference }] }]));
+  }
+});
+
 test('장바구니 fingerprint는 표시 가격·순서와 무관하고 수량·옵션으로 구분한다', () => {
   const [menu] = normalizeMenus(rawMenus);
   const first = createCartItem(menu, [], 2);

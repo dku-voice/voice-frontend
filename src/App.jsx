@@ -3,13 +3,20 @@ import './App.css';
 import { loadPaymentWidget } from '@tosspayments/payment-widget-sdk';
 import { apiClient } from './api/client.js';
 import { kioskApi } from './api/kiosk.js';
-import { normalizeMenus, groupMenus, createCartItem, addCartItem, getOptionGroups, orderStatusLabel, isPaidOrder } from './domain/kiosk.js';
+import { normalizeMenus, groupMenus, createCartItem, addCartItem, getOptionGroups, orderStatusLabel, isPaidOrder, cartFingerprint } from './domain/kiosk.js';
 import { createCheckoutManager } from './domain/checkout.js';
+import { removePaidItemsFromCart } from './domain/cart-settlement.js';
 import { runtimeConfig } from './integration/runtime.js';
 import { openKdsStream } from './integration/sse.js';
 import { browserSessionStorage, readSession, saveSession, clearSession } from './integration/session.js';
+import { changedKdsIds, mergeKdsOrders } from './integration/kds-state.js';
+import { koreaToday } from './integration/date.js';
+import { assertTestWidgetKey, prepareTossWidget, readPaymentReturn } from './integration/payment.js';
+import { describePaymentError } from './integration/payment-error.js';
 
 const AI_WS_URL = runtimeConfig.aiWsUrl;
+const LOCAL_MOCK_PAYMENT = import.meta.env.MODE === 'local-mock'
+  && ['127.0.0.1', 'localhost'].includes(globalThis.window?.location?.hostname);
 
 const fallbackMenuCatalog = [
   {
@@ -74,6 +81,7 @@ function App() {
   const checkoutRef = useRef(null);
   if (!checkoutRef.current) checkoutRef.current = createCheckoutManager({ api: kioskApi, storage: browserSessionStorage });
   const [menuCatalog, setMenuCatalog] = useState(fallbackMenuCatalog);
+  const [adminMenuItems, setAdminMenuItems] = useState([]);
   const [menuSource, setMenuSource] = useState('sample');
   const [menuLoading, setMenuLoading] = useState(true);
   const [menuError, setMenuError] = useState('');
@@ -98,11 +106,12 @@ function App() {
   const [highContrast, setHighContrast] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [snapshotStatus, setSnapshotStatus] = useState('대기 중');
-  const [paymentStatus, setPaymentStatus] = useState('결제 위젯을 준비하지 않았습니다.');
+  const [paymentStatus, setPaymentStatus] = useState('결제 수단을 준비하고 있습니다.');
   const [paymentError, setPaymentError] = useState('');
   const [isPaymentWidgetLoading, setIsPaymentWidgetLoading] = useState(false);
   const [isPaymentWidgetReady, setIsPaymentWidgetReady] = useState(false);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [paymentOrder, setPaymentOrder] = useState(null);
   const [receipt, setReceipt] = useState(null);
   const [receiptOrderId, setReceiptOrderId] = useState('');
   const [receiptError, setReceiptError] = useState('');
@@ -120,8 +129,8 @@ function App() {
   const [adminError, setAdminError] = useState('');
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminAction, setAdminAction] = useState(null);
-  const [statsFrom, setStatsFrom] = useState(new Date().toISOString().slice(0, 10));
-  const [statsTo, setStatsTo] = useState(new Date().toISOString().slice(0, 10));
+  const [statsFrom, setStatsFrom] = useState(() => koreaToday());
+  const [statsTo, setStatsTo] = useState(() => koreaToday());
 
 
   const audioContextRef = useRef(null);
@@ -132,6 +141,14 @@ function App() {
   const voiceGenerationRef = useRef(0);
   const videoRef = useRef(null);
   const paymentWidgetRef = useRef(null);
+  const paymentPreparationRef = useRef(null);
+  const paymentFingerprintRef = useRef(null);
+  const paymentReturnRef = useRef(readPaymentReturn(globalThis.window?.location));
+  const paymentReturnStartedRef = useRef(false);
+  const receiptStateRef = useRef(null);
+  if (!receiptStateRef.current || typeof receiptStateRef.current !== 'object') {
+    receiptStateRef.current = { revision: 0, settledOrderIds: new Set() };
+  }
   const workerRef = useRef(null);
   const wsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
@@ -155,12 +172,15 @@ function App() {
   const authBusyRef = useRef(false);
   const kdsActionRef = useRef(false);
   const kdsRevisionRef = useRef(0);
+  const kdsVersionsRef = useRef(new Map());
   const kdsClosedIdsRef = useRef(new Set());
   const kdsRequestRef = useRef(0);
   const kdsOrdersRef = useRef(kdsOrders);
   kdsOrdersRef.current = kdsOrders;
   const adminActionRef = useRef(false);
   const adminLoadingRef = useRef(false);
+  const adminMenuItemsRef = useRef(adminMenuItems);
+  adminMenuItemsRef.current = adminMenuItems;
   const allMenuItems = useMemo(() => menuCatalog.flatMap((category) => category.items), [menuCatalog]);
   const menuItemsRef = useRef(allMenuItems);
   menuItemsRef.current = allMenuItems;
@@ -182,6 +202,18 @@ function App() {
     () => (menuCatalog.find((category) => category.id === selectedCategory)?.items || []).filter((item) => item.status !== 'INACTIVE'),
     [selectedCategory, menuCatalog],
   );
+
+  const getPendingTossReturn = () => checkoutRef.current.getPendingTossReturn?.(
+    paymentReturnRef.current?.type === 'success' ? paymentReturnRef.current : undefined,
+  ) || null;
+  const hasAuthenticatedPayment = Boolean(getPendingTossReturn());
+  const savedCheckout = checkoutRef.current.getSaved();
+  let paymentInfo = paymentOrder;
+  if (!paymentInfo && savedCheckout?.order) {
+    try {
+      if (hasAuthenticatedPayment || savedCheckout.fingerprint === cartFingerprint(cart)) paymentInfo = savedCheckout.order;
+    } catch { /* Corrupt stored cart data is handled by checkout validation. */ }
+  }
 
   useEffect(() => {
     appMountedRef.current = true;
@@ -227,14 +259,17 @@ function App() {
   }, [cart, menuCatalog]);
 
   useEffect(() => {
+    paymentPreparationRef.current?.abort();
+    paymentWidgetRef.current?.dispose();
     setIsPaymentWidgetReady(false);
     paymentWidgetRef.current = null;
+    setPaymentOrder(null);
     document.querySelector('#payment-widget')?.replaceChildren();
     document.querySelector('#agreement-widget')?.replaceChildren();
   }, [cart]);
 
   useEffect(() => {
-    if (!ageEstimate || paymentBusyRef.current) return;
+    if (!ageEstimate || paymentBusyRef.current || currentScreen === 'payment') return;
     setCurrentScreen('ageResult');
     speak(`예상 연령은 ${ageEstimate}세입니다. 연령대에 맞춘 추천 메뉴를 확인해 주세요.`);
   }, [ageEstimate]);
@@ -346,7 +381,7 @@ function App() {
       return;
     }
 
-    if (data.type === 'order' && data.item) {
+    if (data.type === 'order' && data.item && currentScreen !== 'payment') {
       addToCart(data.item);
     }
 
@@ -360,7 +395,7 @@ function App() {
         return known ? { ...known, confidence: item.confidence } : null;
       }).filter(Boolean) : [];
       setRecommendations(items);
-      if (!paymentBusyRef.current) setCurrentScreen('recommendations');
+      if (!paymentBusyRef.current && currentScreen !== 'payment') setCurrentScreen('recommendations');
     }
 
     if (data.type === 'kds_status' && data.order) {
@@ -645,7 +680,7 @@ function App() {
     if (currentScreen === 'menu' && needSnapshotTouch) captureSnapshot();
   };
 
-  const submitOrderToKds = () => completeDemoPayment();
+  const submitOrderToKds = () => { if (cart.length && !paymentBusyRef.current) setCurrentScreen('payment'); };
 
   const updateKdsStatus = async (id, status) => {
     if (kdsActionRef.current || !sessionRef.current || !['PREPARING', 'COMPLETED'].includes(status)) return;
@@ -657,6 +692,7 @@ function App() {
       await kioskApi.updateKdsStatus(id, status, { token });
       if (sessionRef.current?.accessToken !== token) return;
       kdsRevisionRef.current += 1;
+      kdsVersionsRef.current.set(id, kdsRevisionRef.current);
       if (status === 'COMPLETED') kdsClosedIdsRef.current.add(id);
       setKdsOrders((prev) => status === 'COMPLETED' ? prev.filter((order) => order.id !== id)
         : prev.map((order) => order.id === id ? { ...order, status } : order));
@@ -670,55 +706,198 @@ function App() {
     setAgeEstimate(age);
   };
 
-  const handlePayment = async () => {
-    if (!cart.length || isPaymentWidgetLoading || paymentBusyRef.current) return;
-    try {
-      setPaymentError('');
-      setIsPaymentWidgetReady(false);
-      setIsPaymentWidgetLoading(true);
-      setPaymentStatus('토스페이먼츠 결제 위젯을 불러오는 중입니다.');
-      const key = import.meta.env.VITE_TOSS_CLIENT_KEY || '';
-      if (!/^test_gck_[A-Za-z0-9_]+$/.test(key)) throw new Error('결제위젯용 테스트 클라이언트 키를 확인해 주세요.');
-      document.querySelector('#payment-widget')?.replaceChildren();
-      document.querySelector('#agreement-widget')?.replaceChildren();
-      const widget = await loadPaymentWidget(key, `voice-kiosk-${crypto.randomUUID()}`);
-      if (!appMountedRef.current || !document.querySelector('#payment-widget')) return;
-      paymentWidgetRef.current = widget;
-      widget.renderPaymentMethods('#payment-widget', totalPrice);
-      widget.renderAgreement?.('#agreement-widget');
-      setIsPaymentWidgetReady(true);
-      setPaymentStatus('결제 수단을 확인한 뒤 데모 결제 완료를 눌러 주세요.');
-    } catch (failure) {
-      setIsPaymentWidgetReady(false);
-      setPaymentStatus('결제 위젯을 불러오지 못했습니다.');
-      setPaymentError(failure.message);
-    } finally { setIsPaymentWidgetLoading(false); }
+  const finishPayment = (order) => {
+    if (!isPaidOrder(order)) throw new Error('결제 완료 상태를 확인할 수 없습니다.');
+    receiptStateRef.current.revision += 1;
+    setPaymentError('');
+    setReceiptError('');
+    setReceipt(order);
+    if (!receiptStateRef.current.settledOrderIds.has(order.orderId)) {
+      receiptStateRef.current.settledOrderIds.add(order.orderId);
+      setCart((prev) => removePaidItemsFromCart(prev, order.items));
+    }
+    setPaymentStatus('결제가 완료되었습니다.');
+    setCurrentScreen('kds');
+    addAuditLog('결제 완료', order.orderNumber);
+    speak('결제가 완료되었습니다. 주문이 접수되었습니다.');
   };
 
-  const requestTossPayment = () => {
-    setPaymentStatus('결제는 데모 결제 완료 버튼으로 진행해 주세요.');
+  const clearPaymentReturnUrl = () => {
+    if (['/payment/success', '/payment/fail'].includes(window.location.pathname)) {
+      try { window.history.replaceState(window.history.state, '', '/'); } catch { /* Approval must not depend on browser history access. */ }
+    }
   };
 
-  const completeDemoPayment = async () => {
-    if (paymentBusyRef.current || !cart.length) return;
+  const acceptReceipt = (order, previousCheckout) => {
+    const saved = checkoutRef.current.getSaved();
+    const matchesCheckout = saved?.order?.orderId === order.orderId
+      && previousCheckout?.order?.orderId === order.orderId;
+    if (matchesCheckout && ['paid', 'closed'].includes(saved.phase)) {
+      if (paymentReturnRef.current?.orderNumber === order.orderNumber) {
+        paymentReturnRef.current = null;
+        clearPaymentReturnUrl();
+      }
+      if (saved.phase === 'paid' && isPaidOrder(order) && !receiptStateRef.current.settledOrderIds.has(order.orderId)) {
+        finishPayment(order);
+        return;
+      }
+    }
+    setReceipt(order);
+  };
+
+  const completeTossPayment = async (result) => {
+    if (paymentBusyRef.current) return;
+    paymentReturnRef.current = result;
     paymentBusyRef.current = true;
     setCheckoutBusy(true);
     setPaymentError('');
-    setPaymentStatus('주문과 결제 결과를 확인하고 있습니다.');
+    setIsPaymentWidgetReady(false);
+    setPaymentStatus('결제 승인과 주문 상태를 확인하고 있습니다.');
     try {
-      const order = await checkoutRef.current.payTest(cartRef.current);
-      if (!isPaidOrder(order)) throw new Error('결제 완료 상태를 확인할 수 없습니다.');
-      setReceipt(order);
-      setCart([]);
-      setPaymentStatus('결제가 완료되었습니다.');
-      setCurrentScreen('kds');
-      addAuditLog('결제 완료', order.orderNumber);
-      speak('결제가 완료되었습니다. 주문이 접수되었습니다.');
+      assertTestWidgetKey(import.meta.env.VITE_TOSS_CLIENT_KEY || '');
+      const order = await checkoutRef.current.confirmToss(result);
+      if (!appMountedRef.current) return;
+      paymentReturnRef.current = null;
+      finishPayment(order);
+      clearPaymentReturnUrl();
     } catch (failure) {
-      setPaymentStatus('결제를 완료하지 못했습니다.');
-      setPaymentError(failure.message);
-    } finally { paymentBusyRef.current = false; setCheckoutBusy(false); }
+      if (!appMountedRef.current) return;
+      const details = describePaymentError(failure, { afterAuthentication: true, paymentKey: result.paymentKey });
+      const saved = checkoutRef.current.getSaved();
+      if (saved?.phase === 'closed') {
+        paymentReturnRef.current = null;
+        clearPaymentReturnUrl();
+      }
+      setPaymentStatus(details.title);
+      setPaymentError(details);
+      setPaymentOrder(saved?.order || null);
+    } finally {
+      if (appMountedRef.current) {
+        paymentBusyRef.current = false;
+        setCheckoutBusy(false);
+        // A failed lookup must not discard authentication, including when the
+        // browser refuses storage. The success path removes the return URL.
+      }
+    }
   };
+
+  const handlePayment = async () => {
+    if (!cartRef.current.length || paymentBusyRef.current) return;
+    const pending = getPendingTossReturn();
+    if (pending) {
+      paymentReturnRef.current = pending;
+      setPaymentOrder(checkoutRef.current.getSaved()?.order || null);
+      setIsPaymentWidgetReady(false);
+      setIsPaymentWidgetLoading(false);
+      setPaymentStatus('이전 결제 인증 결과가 남아 있습니다. 아래 버튼으로 결제 결과를 확인해 주세요.');
+      return;
+    }
+    if (paymentReturnRef.current) clearPaymentReturnUrl();
+    paymentReturnRef.current = null;
+    paymentPreparationRef.current?.abort();
+    paymentWidgetRef.current?.dispose();
+    paymentWidgetRef.current = null;
+    const controller = new AbortController();
+    paymentPreparationRef.current = controller;
+    const current = () => !controller.signal.aborted && appMountedRef.current;
+    try {
+      setPaymentError('');
+      setIsPaymentWidgetReady(false);
+      setPaymentOrder(null);
+      setIsPaymentWidgetLoading(true);
+      setPaymentStatus('주문과 결제 수단을 준비하고 있습니다.');
+      const key = import.meta.env.VITE_TOSS_CLIENT_KEY || '';
+      if (!LOCAL_MOCK_PAYMENT) assertTestWidgetKey(key);
+      if (checkoutRef.current.getSaved()?.phase === 'closed') checkoutRef.current.beginNewCheckout();
+      const fingerprint = cartFingerprint(cartRef.current);
+      const order = await checkoutRef.current.prepare(cartRef.current);
+      if (!current()) return;
+      if (isPaidOrder(order)) { finishPayment(order); return; }
+      paymentFingerprintRef.current = fingerprint;
+      setPaymentOrder(order);
+      document.querySelector('#payment-widget')?.replaceChildren();
+      document.querySelector('#agreement-widget')?.replaceChildren();
+      if (!LOCAL_MOCK_PAYMENT) {
+        const widget = await prepareTossWidget({ key, order, loadWidget: loadPaymentWidget, signal: controller.signal });
+        if (!current()) { widget.dispose(); return; }
+        paymentWidgetRef.current = widget;
+      }
+      setIsPaymentWidgetReady(true);
+      setPaymentStatus(LOCAL_MOCK_PAYMENT ? '주문 금액을 확인한 뒤 결제하기를 눌러 주세요.'
+        : '신용·체크카드 또는 카카오·네이버·토스페이를 선택하고, 필수 약관에 동의한 뒤 결제하기를 눌러 주세요.');
+    } catch (failure) {
+      if (!current() || failure.name === 'AbortError') return;
+      setIsPaymentWidgetReady(false);
+      const details = describePaymentError(failure);
+      setPaymentStatus(details.title);
+      setPaymentError(details);
+      document.querySelector('#payment-widget')?.replaceChildren();
+      document.querySelector('#agreement-widget')?.replaceChildren();
+    } finally { if (current()) setIsPaymentWidgetLoading(false); }
+  };
+
+  const requestTossPayment = async () => {
+    if (paymentBusyRef.current || isPaymentWidgetLoading) return;
+    const pending = getPendingTossReturn();
+    if (pending) { await completeTossPayment(pending); return; }
+    if (!cartRef.current.length) return;
+    if (!isPaymentWidgetReady || !paymentOrder) { await handlePayment(); return; }
+    paymentBusyRef.current = true;
+    setCheckoutBusy(true);
+    setPaymentError('');
+    try {
+      if (paymentFingerprintRef.current !== cartFingerprint(cartRef.current)) throw new Error('장바구니가 변경되었습니다. 결제 화면을 다시 열어 주세요.');
+      if (LOCAL_MOCK_PAYMENT) {
+        finishPayment(await checkoutRef.current.payTest(cartRef.current));
+        paymentBusyRef.current = false;
+        setCheckoutBusy(false);
+        return;
+      }
+      assertTestWidgetKey(import.meta.env.VITE_TOSS_CLIENT_KEY || '');
+      setPaymentStatus('결제 인증을 진행해 주세요.');
+      await paymentWidgetRef.current.request({
+        origin: window.location.origin,
+        onRequest: (request) => checkoutRef.current.markTossRequested(request),
+      });
+      // Redirect mode returns to /payment/success or /payment/fail on both desktop and mobile.
+      // Keep the request locked until navigation; an authentication result is not approval.
+    } catch (failure) {
+      setPaymentStatus('결제를 진행하지 못했습니다. 결제 수단을 확인한 뒤 다시 시도해 주세요.');
+      setPaymentError(failure.code === 'USER_CANCEL' ? '결제를 취소했습니다.' : describePaymentError(failure));
+      paymentBusyRef.current = false;
+      setCheckoutBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentScreen !== 'payment' || paymentReturnRef.current) return undefined;
+    handlePayment();
+    return () => {
+      paymentPreparationRef.current?.abort();
+      paymentWidgetRef.current?.dispose();
+      paymentWidgetRef.current = null;
+    };
+  }, [currentScreen, cart]);
+
+  useEffect(() => {
+    const result = paymentReturnRef.current;
+    if (!result || paymentReturnStartedRef.current) return;
+    paymentReturnStartedRef.current = true;
+    setCurrentScreen('payment');
+    if (result.type !== 'success') {
+      setPaymentStatus('결제를 완료하지 못했습니다.');
+      setPaymentError(result.message);
+      clearPaymentReturnUrl();
+      return;
+    }
+    completeTossPayment(result);
+  }, []);
+
+  useEffect(() => () => {
+    // Keep a failed callback visible on its first screen, then allow automatic
+    // widget preparation again when the user leaves and reopens payment.
+    if (currentScreen === 'payment' && !paymentBusyRef.current && paymentReturnRef.current?.type !== 'success') paymentReturnRef.current = null;
+  }, [currentScreen]);
 
   const loadMenus = async () => {
     menuRequestRef.current?.abort();
@@ -730,6 +909,8 @@ function App() {
       const menus = normalizeMenus(await kioskApi.fetchMenus({ signal: controller.signal }));
       if (controller.signal.aborted || !appMountedRef.current) return;
       const categories = groupMenus(menus);
+      adminMenuItemsRef.current = menus;
+      setAdminMenuItems(menus);
       setMenuCatalog(categories);
       setMenuSource('server');
       setSelectedCategory((selected) => categories.some((category) => category.id === selected) ? selected : categories[0]?.id || '');
@@ -742,12 +923,14 @@ function App() {
   };
 
   useEffect(() => {
+    if (paymentReturnRef.current) return undefined;
     let active = true;
+    const revision = receiptStateRef.current.revision;
     const saved = checkoutRef.current.getSaved();
     if (saved?.order?.orderId) {
       checkoutRef.current.readReceipt(saved.order.orderId).then((order) => {
-        if (active) setReceipt(order);
-      }).catch((failure) => { if (active) setReceiptError(failure.message); });
+        if (active && revision === receiptStateRef.current.revision) acceptReceipt(order, saved);
+      }).catch((failure) => { if (active && revision === receiptStateRef.current.revision) setReceiptError(failure.message); });
     }
     return () => { active = false; };
   }, []);
@@ -757,6 +940,8 @@ function App() {
     clearSession();
     sessionRef.current = null;
     setSession(null);
+    kdsVersionsRef.current.clear();
+    kdsClosedIdsRef.current.clear();
     setKdsOrders([]);
     setAdminData({ orders: [], payments: [], sales: null, popular: [] });
     setAuthError('로그인이 만료되었거나 접근 권한이 없습니다. 다시 로그인해 주세요.');
@@ -772,7 +957,14 @@ function App() {
 
   useEffect(() => {
     if (!session) return undefined;
-    const timer = setTimeout(() => expireSession(session.accessToken), Math.max(0, session.expiresAt - Date.now()));
+    let timer;
+    const checkExpiry = () => {
+      const remaining = session.expiresAt - Date.now();
+      if (remaining <= 0) { expireSession(session.accessToken); return; }
+      // Browsers overflow a setTimeout delay greater than 2^31-1 milliseconds.
+      timer = setTimeout(checkExpiry, Math.min(remaining, 2147483647));
+    };
+    checkExpiry();
     return () => clearTimeout(timer);
   }, [session]);
 
@@ -798,15 +990,18 @@ function App() {
     authBusyRef.current = true;
     setAuthBusy(true);
     const token = sessionRef.current.accessToken;
+    // This device signs out immediately even when server-side token revocation fails.
+    clearSession();
+    sessionRef.current = null;
+    setSession(null);
+    kdsVersionsRef.current.clear();
+    kdsClosedIdsRef.current.clear();
+    setKdsOrders([]);
+    setAdminData({ orders: [], payments: [], sales: null, popular: [] });
+    setAuthError('');
     try {
       await kioskApi.logout({ token });
-      clearSession();
-      sessionRef.current = null;
-      setSession(null);
-      setKdsOrders([]);
-      setAdminData({ orders: [], payments: [], sales: null, popular: [] });
-      setAuthError('');
-    } catch (failure) { setAuthError(`로그아웃 요청: ${failure.message}`); }
+    } catch { setAuthError('이 기기에서는 로그아웃되었습니다. 서버의 토큰 폐기 여부는 확인하지 못했습니다.'); }
     finally { authBusyRef.current = false; setAuthBusy(false); }
   };
 
@@ -814,7 +1009,7 @@ function App() {
     const token = sessionRef.current?.accessToken;
     if (!token) return;
     const request = ++kdsRequestRef.current;
-    const revision = kdsRevisionRef.current;
+    const versions = new Map(kdsVersionsRef.current);
     setKdsLoading(true);
     setKdsError('');
     try {
@@ -822,8 +1017,9 @@ function App() {
       if (!Array.isArray(data)) throw new Error('주방 주문 목록 형식을 확인해 주세요.');
       if (signal?.aborted || request !== kdsRequestRef.current || sessionRef.current?.accessToken !== token) return;
       const cards = data.filter((order) => ['PAID', 'PREPARING'].includes(order.status) && !kdsClosedIdsRef.current.has(order.orderId)).map(toKdsCard);
-      setKdsOrders((prev) => revision === kdsRevisionRef.current ? cards
-        : [...new Map([...cards, ...prev].map((order) => [order.id, order])).values()].filter((order) => !kdsClosedIdsRef.current.has(order.id)));
+      const changedIds = changedKdsIds(versions, kdsVersionsRef.current);
+      setKdsOrders((prev) => mergeKdsOrders({ serverOrders: cards, currentOrders: prev,
+        changedIds, closedIds: kdsClosedIdsRef.current }));
     } catch (failure) {
       if (!signal?.aborted && request === kdsRequestRef.current && sessionRef.current?.accessToken === token) setKdsError(failure.message);
     } finally { if (!signal?.aborted && request === kdsRequestRef.current) setKdsLoading(false); }
@@ -848,6 +1044,7 @@ function App() {
           const prior = kdsOrdersRef.current.find((item) => item.id === data.orderId);
           const order = toKdsCard({ ...data, status: data.status || prior?.status || 'PAID' });
           kdsRevisionRef.current += 1;
+          kdsVersionsRef.current.set(order.id, kdsRevisionRef.current);
           setKdsOrders((prev) => [order, ...prev.filter((item) => item.id !== order.id)]);
         } catch (failure) { setKdsError(failure.message); }
       },
@@ -899,9 +1096,12 @@ function App() {
     try {
       await kioskApi.updateMenuStatus(menuId, status, { token });
       if (sessionRef.current?.accessToken !== token) return;
-      setMenuCatalog((prev) => prev.map((category) => ({
-        ...category, items: category.items.map((item) => item.menuId === menuId ? { ...item, status } : item),
-      })));
+      const menus = adminMenuItemsRef.current.map((item) => item.menuId === menuId ? { ...item, status } : item);
+      adminMenuItemsRef.current = menus;
+      setAdminMenuItems(menus);
+      const categories = groupMenus(menus);
+      setMenuCatalog(categories);
+      setSelectedCategory((selected) => categories.some((category) => category.id === selected) ? selected : categories[0]?.id || '');
       addAuditLog('메뉴 상태 변경', `${menuId} → ${status}`, 'ADMIN');
     } catch (failure) { setAdminError(failure.message); }
     finally { adminActionRef.current = false; setAdminAction(null); }
@@ -912,9 +1112,10 @@ function App() {
     adminActionRef.current = true;
     setAdminAction(`order-${orderId}`);
     const token = sessionRef.current.accessToken;
+    const revision = ++receiptStateRef.current.revision;
     try {
       const order = await kioskApi.getAdminOrder(orderId, { token });
-      if (sessionRef.current?.accessToken === token) { setReceipt(order); setReceiptError(''); }
+      if (sessionRef.current?.accessToken === token && revision === receiptStateRef.current.revision) { setReceipt(order); setReceiptError(''); }
     } catch (failure) { setAdminError(failure.message); }
     finally { adminActionRef.current = false; setAdminAction(null); }
   };
@@ -929,7 +1130,12 @@ function App() {
       await kioskApi.cancelPayment({ pgTransactionId: payment.pgTransactionId, cancelReason: '고객 요청' });
       addAuditLog('결제 취소', `주문 ${payment.orderId}`, 'ADMIN');
       await loadAdmin();
-      if (receipt?.orderId === payment.orderId) setReceipt(await checkoutRef.current.readReceipt(payment.orderId));
+      if (receipt?.orderId === payment.orderId) {
+        const revision = ++receiptStateRef.current.revision;
+        const previousCheckout = checkoutRef.current.getSaved();
+        const order = await checkoutRef.current.readReceipt(payment.orderId);
+        if (revision === receiptStateRef.current.revision) acceptReceipt(order, previousCheckout);
+      }
     } catch (failure) { setAdminError(failure.message); }
     finally { adminActionRef.current = false; setAdminAction(null); }
   };
@@ -939,8 +1145,12 @@ function App() {
     if (receiptBusy) return;
     setReceiptBusy(true);
     setReceiptError('');
-    try { setReceipt(await checkoutRef.current.readReceipt(Number(receiptOrderId))); }
-    catch (failure) { setReceiptError(failure.message); }
+    const revision = ++receiptStateRef.current.revision;
+    const previousCheckout = checkoutRef.current.getSaved();
+    try {
+      const order = await checkoutRef.current.readReceipt(Number(receiptOrderId));
+      if (revision === receiptStateRef.current.revision) acceptReceipt(order, previousCheckout);
+    } catch (failure) { if (revision === receiptStateRef.current.revision) setReceiptError(failure.message); }
     finally { setReceiptBusy(false); }
   };
 
@@ -975,7 +1185,7 @@ function App() {
       <p>{screen === 'admin' ? '관리자' : '주방 직원'} 로그인이 필요합니다.</p>
       <label>아이디 <input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
       <label>비밀번호 <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
-      <button type="submit" className="primary" disabled={authBusy}>{authBusy ? '로그인 중...' : '로그인'}</button>
+      <button type="submit" className="primary" disabled={authBusy}>{authBusy ? '처리 중...' : '로그인'}</button>
     </form>}
     {authError && <p role="alert" className="error">{authError}</p>}
   </div>;
@@ -1010,7 +1220,7 @@ function App() {
     {adminBusy && <p role="status">관리 정보를 불러오는 중입니다.</p>}
     {adminData.sales && <p>총 매출 {formatPrice(adminData.sales.totalSales)} · 주문 {adminData.sales.totalOrders ?? 0}건 · 평균 {formatPrice(adminData.sales.averageOrder)}</p>}
     <details><summary>인기 메뉴</summary>{adminData.popular.map((row, index) => Array.isArray(row) && <p key={`${row[0]}-${index}`}>{row[0]} · {row[1]}개</p>)}</details>
-    <details><summary>메뉴 판매 상태</summary>{allMenuItems.filter((item) => Number.isSafeInteger(item.menuId)).map((item) => <label key={item.menuId} className="toggle-row">
+    <details><summary>메뉴 판매 상태</summary>{adminMenuItems.map((item) => <label key={item.menuId} className="toggle-row">
       {item.name}<select value={item.status} disabled={adminAction !== null} onChange={(event) => changeMenuStatus(item.menuId, event.target.value)}>
         <option value="ACTIVE">정상 판매</option><option value="SOLD_OUT">품절</option><option value="INACTIVE">비활성</option>
       </select>
@@ -1074,6 +1284,7 @@ function App() {
       <section className="assist-panel">
         <h2>주문 도우미</h2>
         <p>{message}</p>
+        {hasAuthenticatedPayment && <p className="hint" role="status">메뉴는 담을 수 있습니다. 새 주문 결제 전에는 장바구니에서 이전 결제 결과를 확인해 주세요.</p>}
         {error && <p className="error" role="alert">{error}</p>}
         {menuLoading && <p role="status">메뉴를 불러오는 중입니다.</p>}
         {menuError && <p className="error" role="alert">{menuError}</p>}
@@ -1122,6 +1333,7 @@ function App() {
         <h2>장바구니</h2>
         <strong>{formatPrice(totalPrice)}</strong>
       </div>
+      {hasAuthenticatedPayment && <p role="status">메뉴는 담거나 수정할 수 있습니다. 새 주문 결제 전에는 아래 버튼으로 이전 결제 결과를 먼저 확인해 주세요.</p>}
       {!cart.length ? (
         <p className="empty">장바구니가 비어 있습니다. 메뉴 화면에서 상품을 담아 주세요.</p>
       ) : (
@@ -1134,10 +1346,10 @@ function App() {
                 <p>{formatPrice(item.price)} / 합계 {formatPrice(item.price * item.quantity)}</p>
               </div>
               <div className="quantity-controls">
-                <button onClick={() => updateQuantity(item.lineId, item.quantity - 1)}>-</button>
+                <button disabled={checkoutBusy} onClick={() => updateQuantity(item.lineId, item.quantity - 1)}>-</button>
                 <span>{item.quantity}</span>
-                <button onClick={() => updateQuantity(item.lineId, item.quantity + 1)}>+</button>
-                <button onClick={() => removeFromCart(item.lineId)}>삭제</button>
+                <button disabled={checkoutBusy} onClick={() => updateQuantity(item.lineId, item.quantity + 1)}>+</button>
+                <button disabled={checkoutBusy} onClick={() => removeFromCart(item.lineId)}>삭제</button>
               </div>
             </article>
           ))}
@@ -1147,8 +1359,8 @@ function App() {
       <div className="action-row">
         <button onClick={() => setCurrentScreen('menu')}>메뉴로 돌아가기</button>
         <button onClick={() => setCurrentScreen('recommendations')}>추천 확인</button>
-        <button className="primary" disabled={!cart.length} onClick={() => setCurrentScreen('payment')}>
-          결제하기
+        <button className="primary" disabled={!cart.length && !hasAuthenticatedPayment} onClick={() => setCurrentScreen('payment')}>
+          {hasAuthenticatedPayment ? '결제 결과 확인' : '결제하기'}
         </button>
       </div>
     </main>
@@ -1178,10 +1390,23 @@ function App() {
     <main className="screen">
       <div className="screen-heading">
         <h2>결제</h2>
-        <strong>{formatPrice(totalPrice)}</strong>
+        <strong>{formatPrice(paymentInfo?.totalPrice ?? totalPrice)}</strong>
       </div>
       <p role="status" aria-live="polite">{paymentStatus}</p>
-      {paymentError && <p className="error">{paymentError}</p>}
+      {hasAuthenticatedPayment && typeof paymentInfo?.orderNumber === 'string' && <p className="hint">
+        이전 주문 {paymentInfo.orderNumber}의 결과를 확인합니다. 추가한 메뉴는 장바구니에 별도로 유지됩니다.
+      </p>}
+      {paymentError && <>
+        <p className="error" role="alert">{typeof paymentError === 'string' ? paymentError : paymentError.message}</p>
+        {typeof paymentInfo?.orderNumber === 'string' && Number.isSafeInteger(paymentInfo.orderId) && <p className="hint">
+          주문번호 {paymentInfo.orderNumber} · 주문 ID {paymentInfo.orderId}
+        </p>}
+        {(paymentError.requestPath || paymentError.status) && <details className="menu-details">
+          <summary>오류 정보</summary>
+          <p>{paymentError.stage}{paymentError.status ? ` · HTTP ${paymentError.status}` : ''}</p>
+          {paymentError.requestPath && <code>{paymentError.requestMethod} {paymentError.requestPath}</code>}
+        </details>}
+      </>}
       <div className="payment-shell">
         {isPaymentWidgetLoading && (
           <div className="payment-placeholder">
@@ -1190,7 +1415,7 @@ function App() {
         )}
         {!isPaymentWidgetLoading && !isPaymentWidgetReady && (
           <div className="payment-placeholder">
-            아래 버튼을 누르면 토스페이먼츠 SDK 결제수단 UI가 이 영역에 표시됩니다.
+            {paymentError ? '결제 준비 상태를 확인해 주세요.' : '결제 수단을 자동으로 불러옵니다.'}
           </div>
         )}
         <div id="payment-widget" className="payment-widget" />
@@ -1198,13 +1423,11 @@ function App() {
       </div>
       <div className="action-row">
         <button disabled={checkoutBusy} onClick={() => setCurrentScreen('cart')}>장바구니로 돌아가기</button>
-        <button disabled={!cart.length || isPaymentWidgetLoading || checkoutBusy} onClick={handlePayment}>
-          결제 위젯 불러오기
+        <button className="primary" disabled={(!cart.length && !hasAuthenticatedPayment) || isPaymentWidgetLoading || checkoutBusy} onClick={requestTossPayment}>
+          {checkoutBusy ? '결제 처리 중...' : hasAuthenticatedPayment
+            ? savedCheckout?.phase === 'confirming' ? '결제 상태 확인' : '결제 계속하기'
+            : savedCheckout?.phase === 'closed' ? '새 주문으로 결제' : '결제하기'}
         </button>
-        <button className="primary" disabled title="서버 결제는 데모 결제 완료 버튼으로 진행합니다." onClick={requestTossPayment}>
-          SDK 결제 요청
-        </button>
-        <button className="primary" disabled={!cart.length || checkoutBusy} onClick={completeDemoPayment}>데모 결제 완료</button>
       </div>
     </main>
   );
@@ -1230,7 +1453,7 @@ function App() {
         <button className="primary" disabled={!cart.length || checkoutBusy} onClick={submitOrderToKds}>현재 장바구니 접수</button>
       </div>
       {renderReceipt()}
-      {paymentError && <p className="error" role="alert">{paymentError}</p>}
+      {paymentError && <p className="error" role="alert">{typeof paymentError === 'string' ? paymentError : paymentError.message}</p>}
       {renderLogin('kds')}
       {session && <>
         <div className="action-row"><button disabled={kdsLoading || kdsUpdating !== null} onClick={() => loadKdsOrders()}>주문 새로고침</button><span>실시간 주문: {statusLabel[kdsStreamStatus] || kdsStreamStatus}</span></div>

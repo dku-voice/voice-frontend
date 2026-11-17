@@ -1,10 +1,12 @@
 export class ApiError extends Error {
-  constructor(message, { code, status, serverMessage, cause } = {}) {
+  constructor(message, { code, status, serverMessage, cause, requestPath, requestMethod } = {}) {
     super(message, { cause });
     this.name = 'ApiError';
     this.code = code;
     if (status !== undefined) this.status = status;
     if (serverMessage) this.serverMessage = serverMessage;
+    if (requestPath !== undefined) this.requestPath = requestPath;
+    if (requestMethod !== undefined) this.requestMethod = requestMethod;
   }
 }
 
@@ -30,29 +32,36 @@ export function createApiClient({
     if (typeof path !== 'string' || !path.startsWith('/api/')) {
       throw new ApiError('API 요청 경로를 확인해 주세요.', { code: 'INVALID_INPUT' });
     }
-    if (signal?.aborted) throw new ApiError('요청이 취소되었습니다.', { code: 'ABORTED' });
+    // Keep only endpoint/method context. Queries, headers and request bodies can
+    // contain credentials or a payment key and must never be attached to errors.
+    const requestContext = {
+      requestPath: path.split(/[?#]/, 1)[0],
+      requestMethod: typeof method === 'string' && /^[A-Za-z]+$/.test(method) ? method.toUpperCase() : 'UNKNOWN',
+    };
+    const requestError = (message, options) => new ApiError(message, { ...options, ...requestContext });
+    if (signal?.aborted) throw requestError('요청이 취소되었습니다.', { code: 'ABORTED' });
 
     let requestToken = token;
     if (auth && requestToken === undefined) {
       try { requestToken = tokenGetter?.(); } catch { requestToken = null; }
     }
     if (requestToken != null && (typeof requestToken !== 'string' || /\s/.test(requestToken.trim()))) {
-      throw new ApiError('인증 토큰 형식을 확인해 주세요.', { code: 'INVALID_INPUT' });
+      throw requestError('인증 토큰 형식을 확인해 주세요.', { code: 'INVALID_INPUT' });
     }
     requestToken = typeof requestToken === 'string' ? requestToken.trim() : '';
     if (auth && !requestToken) {
-      throw new ApiError('로그인이 필요합니다. 다시 로그인해 주세요.', { code: 'AUTH_REQUIRED', status: 401 });
+      throw requestError('로그인이 필요합니다. 다시 로그인해 주세요.', { code: 'AUTH_REQUIRED', status: 401 });
     }
 
     let encodedBody;
     try { encodedBody = body === undefined ? undefined : JSON.stringify(body); } catch (cause) {
-      throw new ApiError('API 요청 데이터 형식을 확인해 주세요.', { code: 'INVALID_INPUT', cause });
+      throw requestError('API 요청 데이터 형식을 확인해 주세요.', { code: 'INVALID_INPUT', cause });
     }
     const controller = new AbortController();
     let abortCode;
     let rejectInterrupted;
     const interrupted = new Promise((_resolve, reject) => { rejectInterrupted = reject; });
-    const abortError = (code, cause) => new ApiError(code === 'TIMEOUT'
+    const abortError = (code, cause) => requestError(code === 'TIMEOUT'
       ? '서버 응답 시간이 초과되었습니다. 처리 결과를 확인한 뒤 다시 시도해 주세요.'
       : '요청이 취소되었습니다.', { code, cause });
     const interrupt = (code) => {
@@ -67,11 +76,15 @@ export function createApiClient({
 
     const httpError = (response, serverMessage, cause) => {
       const forbidden = response.status === 403;
-      const error = new ApiError(forbidden ? authMessage
+      const unauthorized = response.status === 401;
+      const authFailure = forbidden || unauthorized;
+      const sessionFailure = authFailure && (auth || Boolean(requestToken));
+      const error = requestError(sessionFailure ? authMessage
+        : authFailure ? serverMessage || `서버에서 요청을 거절했습니다. (HTTP ${response.status})`
         : serverMessage || `서버 요청에 실패했습니다. (HTTP ${response.status})`, {
-        code: forbidden ? 'FORBIDDEN' : 'HTTP_ERROR', status: response.status, serverMessage, cause,
+        code: forbidden ? 'FORBIDDEN' : unauthorized ? 'UNAUTHORIZED' : 'HTTP_ERROR', status: response.status, serverMessage, cause,
       });
-      if (forbidden && requestToken) {
+      if (sessionFailure && requestToken) {
         // The UI can ignore a late 403 for a token that has already been replaced.
         // Keep it non-enumerable so serializing an error never prints the token.
         Object.defineProperty(error, 'token', { value: requestToken });
@@ -104,7 +117,7 @@ export function createApiClient({
         } catch (cause) {
           if (controller.signal.aborted) throw abortError(abortCode || 'ABORTED', cause);
           if (!response.ok) throw httpError(response, null, cause);
-          throw new ApiError('서버 응답이 올바른 JSON 형식이 아닙니다. API 주소를 확인해 주세요.', {
+          throw requestError('서버 응답이 올바른 JSON 형식이 아닙니다. API 주소를 확인해 주세요.', {
             code: 'INVALID_RESPONSE', status: response.status, cause,
           });
         }
@@ -113,24 +126,27 @@ export function createApiClient({
           ? envelope.message : null;
         if (!response.ok) throw httpError(response, serverMessage);
         if (!envelope || typeof envelope.success !== 'boolean') {
-          throw new ApiError('서버 응답 형식이 올바르지 않습니다.', { code: 'INVALID_RESPONSE', status: response.status });
+          throw requestError('서버 응답 형식이 올바르지 않습니다.', { code: 'INVALID_RESPONSE', status: response.status });
         }
         if (!envelope.success) {
-          throw new ApiError(serverMessage || '서버에서 요청을 처리하지 못했습니다.', {
+          throw requestError(serverMessage || '서버에서 요청을 처리하지 못했습니다.', {
             code: 'API_ERROR', status: response.status, serverMessage,
           });
         }
         if (!Object.prototype.hasOwnProperty.call(envelope, 'data')) {
-          throw new ApiError('서버 응답에 결과 데이터가 없습니다.', { code: 'INVALID_RESPONSE', status: response.status });
+          throw requestError('서버 응답에 결과 데이터가 없습니다.', { code: 'INVALID_RESPONSE', status: response.status });
         }
         return envelope.data;
       })();
       return await Promise.race([operation, interrupted]);
     } catch (cause) {
-      if (cause instanceof ApiError) throw cause;
+      if (cause instanceof ApiError) {
+        Object.assign(cause, requestContext);
+        throw cause;
+      }
       if (abortCode) throw abortError(abortCode, cause);
       if (cause?.name === 'AbortError') throw abortError('ABORTED', cause);
-      throw new ApiError('서버에 연결할 수 없습니다. 네트워크와 API 서버 주소를 확인해 주세요.', {
+      throw requestError('서버에 연결할 수 없습니다. 네트워크와 API 서버 주소를 확인해 주세요.', {
         code: 'NETWORK_ERROR', cause,
       });
     } finally {

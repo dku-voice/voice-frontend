@@ -1,4 +1,23 @@
 const SESSION_KEY = 'voice-kiosk-session';
+const FALLBACK_DURATION = 24 * 60 * 60 * 1000;
+
+// This only reads an expiry hint for UI/session timing. JWT signature and access
+// permissions must still be checked by the backend on every protected request.
+const tokenExpiry = (token) => {
+  try {
+    const segments = token.split('.');
+    if (segments.length !== 3 || !segments[1] || typeof globalThis.atob !== 'function') return null;
+    const encoded = segments[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '=');
+    const bytes = Uint8Array.from(globalThis.atob(padded), (character) => character.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes));
+    const expiresAt = payload?.exp * 1000;
+    return typeof payload?.exp === 'number' && Number.isFinite(expiresAt)
+      && Math.abs(expiresAt) <= 8.64e15 ? expiresAt : null;
+  } catch {
+    return null;
+  }
+};
 
 export const browserSessionStorage = {
   getItem: (key) => typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(key),
@@ -11,11 +30,16 @@ export function readSession(storage = browserSessionStorage, now = Date.now()) {
     const session = JSON.parse(storage.getItem(SESSION_KEY));
     if (!session || typeof session.accessToken !== 'string' || !session.accessToken.trim()
       || !['ADMIN', 'STAFF'].includes(session.role) || !Number.isFinite(session.expiresAt)
-      || session.expiresAt <= now) {
+      || /\s/.test(session.accessToken)) {
       storage.removeItem(SESSION_KEY);
       return null;
     }
-    return session;
+    const expiresAt = tokenExpiry(session.accessToken) ?? session.expiresAt;
+    if (expiresAt <= now) {
+      storage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return { accessToken: session.accessToken, role: session.role, expiresAt };
   } catch {
     return null;
   }
@@ -26,7 +50,9 @@ export function saveSession(data, storage = browserSessionStorage, now = Date.no
     || /\s/.test(data.accessToken) || !['ADMIN', 'STAFF'].includes(data.role)) {
     throw new Error('로그인 응답을 확인할 수 없습니다.');
   }
-  const session = { accessToken: data.accessToken, role: data.role, expiresAt: now + 24 * 60 * 60 * 1000 };
+  const expiresAt = tokenExpiry(data.accessToken) ?? now + FALLBACK_DURATION;
+  if (expiresAt <= now) throw new Error('로그인 토큰이 이미 만료되었습니다. 다시 로그인해 주세요.');
+  const session = { accessToken: data.accessToken, role: data.role, expiresAt };
   // A blocked browser store still permits an in-memory session until the page closes.
   try { storage.setItem(SESSION_KEY, JSON.stringify(session)); } catch { /* Memory only. */ }
   return session;

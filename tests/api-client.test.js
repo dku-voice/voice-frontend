@@ -101,6 +101,48 @@ test('빈 403 응답도 인증 오류로 처리하고 hook 오류가 원래 API 
   await assert.rejects(client.request('/api/kds/orders', { auth: true, token: 'token' }), { code: 'FORBIDDEN', status: 403 });
 });
 
+test('보호 요청의 401도 해당 토큰 세션을 만료시키며 토큰 없는 로그인 실패는 만료 hook을 호출하지 않는다', async () => {
+  const expired = [];
+  const client = createApiClient({ onAuthError: (error) => expired.push(error.token),
+    fetchImpl: async () => json({ success: false, data: null, message: 'Unauthorized' }, 401) });
+  await assert.rejects(client.request('/api/admin/orders', { auth: true, token: 'expired-token' }), { code: 'UNAUTHORIZED', status: 401 });
+  await assert.rejects(client.request('/api/auth/login', { method: 'POST', body: { username: 'bad', password: 'bad' } }), { status: 401 });
+  assert.deepEqual(expired, ['expired-token']);
+});
+
+test('공개 주문 API의 CORS 403을 세션 만료로 표시하거나 직원 세션을 지우지 않는다', async () => {
+  let calls = 0;
+  let expired = 0;
+  const client = createApiClient({ getAccessToken: () => 'staff-token', onAuthError: () => { expired += 1; },
+    fetchImpl: async (url, options) => {
+      calls += 1;
+      assert.equal(url, '/api/orders');
+      assert.equal(options.method, 'POST');
+      assert.equal(options.headers.Authorization, undefined);
+      return new Response('Invalid CORS request', { status: 403, headers: { 'Content-Type': 'text/plain' } });
+    } });
+  await assert.rejects(client.request('/api/orders', { method: 'POST', body: { items: [] } }), (error) => {
+    assert.equal(error.status, 403);
+    assert.equal(error.code, 'FORBIDDEN');
+    assert(error.message.includes('요청을 거절'));
+    assert(!error.message.includes('로그인'));
+    assert(!error.message.includes('세션'));
+    return true;
+  });
+  assert.equal(calls, 1);
+  assert.equal(expired, 0);
+});
+
+test('공개 API의 401/403은 서버 메시지를 보존하고 토큰 없는 로그인 실패를 세션 만료로 바꾸지 않는다', async () => {
+  for (const status of [401, 403]) {
+    let expired = 0;
+    const message = '아이디 또는 비밀번호가 올바르지 않습니다.';
+    const client = createApiClient({ onAuthError: () => { expired += 1; }, fetchImpl: async () => json({ success: false, data: null, message }, status) });
+    await assert.rejects(client.request('/api/auth/login', { method: 'POST', body: {} }), { status, message, serverMessage: message });
+    assert.equal(expired, 0);
+  }
+});
+
 test('네트워크 실패는 원인을 보존하고 요청을 재시도하지 않는다', async () => {
   let calls = 0;
   const cause = new TypeError('Failed to fetch');
@@ -146,4 +188,93 @@ test('본문 읽기까지 시간 제한을 적용하고 취소 후 늦은 403은
   respond(json({ message: 'Expired' }, 403));
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(cleared, false);
+});
+
+test('HTTP 오류는 경로·메서드·상태를 남기고 쿼리·인증·결제키·비밀번호·본문은 첨부하지 않는다', async () => {
+  const queryToken = 'query-token-fixture';
+  const bearerToken = 'bearer-token-fixture';
+  const paymentKey = 'payment-key-fixture';
+  const password = 'password-fixture';
+  const path = `/api/payments/confirm?token=${queryToken}&paymentKey=${paymentKey}`;
+  let calls = 0;
+  const client = createApiClient({ fetchImpl: async (url, options) => {
+    calls += 1;
+    assert.equal(url, path);
+    assert.equal(options.method, 'post');
+    assert.equal(options.headers.Authorization, `Bearer ${bearerToken}`);
+    assert.deepEqual(JSON.parse(options.body), { paymentKey, password });
+    return json({ status: 500, message: '서버 오류가 발생했습니다.' }, 500);
+  } });
+  await assert.rejects(client.request(path, { method: 'post', token: bearerToken, body: { paymentKey, password } }), (error) => {
+    assert.equal(error.code, 'HTTP_ERROR');
+    assert.equal(error.status, 500);
+    assert.equal(error.requestPath, '/api/payments/confirm');
+    assert.equal(error.requestMethod, 'POST');
+    const serialized = JSON.stringify(error);
+    for (const secret of [queryToken, bearerToken, paymentKey, password]) assert(!serialized.includes(secret));
+    for (const forbidden of ['body', 'headers', 'url', 'token', 'password', 'paymentKey']) assert(!Object.hasOwn(error, forbidden));
+    return true;
+  });
+  assert.equal(calls, 1);
+});
+
+test('JSON·envelope 오류와 비JSON HTTP 실패에도 실제 요청 경로·메서드·상태를 보존한다', async () => {
+  const cases = [
+    [() => new Response('{broken', { headers: { 'Content-Type': 'application/json' } }), 'INVALID_RESPONSE', 200],
+    [() => json({ success: true }), 'INVALID_RESPONSE', 200],
+    [() => json({ success: false, data: null, message: '조회 실패' }), 'API_ERROR', 200],
+    [() => new Response('<html>upstream error</html>', { status: 502, headers: { 'Content-Type': 'text/html' } }), 'HTTP_ERROR', 502],
+  ];
+  for (const [response, code, status] of cases) {
+    const client = createApiClient({ fetchImpl: async () => response() });
+    await assert.rejects(client.request('/api/orders/731?token=query-fixture'), (error) => {
+      assert.equal(error.code, code);
+      assert.equal(error.status, status);
+      assert.equal(error.requestPath, '/api/orders/731');
+      assert.equal(error.requestMethod, 'GET');
+      assert(!JSON.stringify(error).includes('query-fixture'));
+      return true;
+    });
+  }
+});
+
+test('네트워크 실패에 상태 코드를 꾸며 넣지 않고 안전한 요청 문맥만 첨부한다', async () => {
+  const cause = new TypeError('Failed to fetch');
+  let calls = 0;
+  const client = createApiClient({ fetchImpl: async () => { calls += 1; throw cause; } });
+  await assert.rejects(client.request('/api/orders?token=network-fixture', { method: 'POST', body: { password: 'body-fixture' } }), (error) => {
+    assert.equal(error.code, 'NETWORK_ERROR');
+    assert.equal(error.cause, cause);
+    assert.equal(error.status, undefined);
+    assert.equal(error.requestPath, '/api/orders');
+    assert.equal(error.requestMethod, 'POST');
+    assert(!JSON.stringify(error).includes('network-fixture'));
+    assert(!JSON.stringify(error).includes('body-fixture'));
+    return true;
+  });
+  assert.equal(calls, 1);
+});
+
+test('시간 초과·진행 중 취소·전송 전 취소도 쿼리 없는 요청 문맥을 보존한다', async () => {
+  const expectContext = (code, path, method) => (error) => {
+    assert.equal(error.code, code);
+    assert.equal(error.requestPath, path);
+    assert.equal(error.requestMethod, method);
+    assert.equal(error.status, undefined);
+    assert(!JSON.stringify(error).includes('cancel-fixture'));
+    return true;
+  };
+  let calls = 0;
+  const waiting = createApiClient({ timeoutMs: 5, fetchImpl: () => { calls += 1; return new Promise(() => {}); } });
+  await assert.rejects(waiting.request('/api/payments/confirm?paymentKey=cancel-fixture', { method: 'POST', body: {} }),
+    expectContext('TIMEOUT', '/api/payments/confirm', 'POST'));
+  const controller = new AbortController();
+  const pending = waiting.request('/api/orders/731?token=cancel-fixture', { signal: controller.signal });
+  controller.abort();
+  await assert.rejects(pending, expectContext('ABORTED', '/api/orders/731', 'GET'));
+  const cancelled = new AbortController();
+  cancelled.abort();
+  await assert.rejects(waiting.request('/api/menus?token=cancel-fixture', { signal: cancelled.signal }),
+    expectContext('ABORTED', '/api/menus', 'GET'));
+  assert.equal(calls, 2);
 });

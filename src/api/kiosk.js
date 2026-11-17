@@ -53,16 +53,19 @@ export function createKioskApi({ client = apiClient } = {}) {
     }),
     getOrder: async (orderId, { signal } = {}) => client.request(`/api/orders/${id(orderId, '주문')}`, { signal }),
     confirmPayment: async (payload, { signal } = {}) => {
-      if (payload?.pgProvider !== 'TEST' || payload.method !== 'CARD') {
-        throw invalidInput('현재 시연에서는 TEST 카드 결제만 사용할 수 있습니다.');
+      const provider = payload?.pgProvider;
+      const method = payload?.method ?? 'CARD';
+      if (!['TEST', 'TOSS'].includes(provider)
+        || (provider === 'TEST' ? method !== 'CARD' : !['CARD', 'KAKAO_PAY', 'NAVER_PAY', 'TOSS'].includes(method))) {
+        throw invalidInput('지원하는 결제 서비스와 결제 수단을 확인해 주세요.');
       }
       id(payload.orderId, '주문');
       if (!positiveInteger(payload.amount)) throw invalidInput('서버에서 확인한 결제 금액을 사용해 주세요.');
       return client.request('/api/payments/confirm', {
         method: 'POST', signal,
         body: {
-          pgProvider: 'TEST', pgTransactionId: requiredText(payload.pgTransactionId, '결제 거래 ID'),
-          orderId: payload.orderId, amount: payload.amount, method: 'CARD',
+          pgProvider: provider, pgTransactionId: requiredText(payload.pgTransactionId, '결제 거래 ID'),
+          orderId: payload.orderId, amount: payload.amount, method,
         },
       });
     },

@@ -13,6 +13,6 @@ module.exports = {
   ignorePatterns: ['dist/', 'build/', 'node_modules/'],
   overrides: [
     { files: ['public/pcm-capture-processor.js'], rules: { 'no-redeclare': ['error', { builtinGlobals: false }] } },
-    { files: ['*.config.js', '*.cjs', 'tests/**/*.js', 'src/App.test.js'], env: { node: true } },
+    { files: ['*.config.js', '*.cjs', 'tests/**/*.js', 'scripts/**/*.js', 'src/App.test.js'], env: { node: true } },
   ],
 };
