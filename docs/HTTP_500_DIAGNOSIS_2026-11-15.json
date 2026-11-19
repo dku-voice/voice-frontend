@@ -1,0 +1,417 @@
+{
+  "checkedAtKST": "2026-11-15 15:51:57",
+  "scope": {
+    "remoteMethods": [
+      "GET"
+    ],
+    "remoteLoginPerformed": false,
+    "validAuthenticatedRemoteRequestsPerformed": false,
+    "sourceCodeChanged": false,
+    "realCredentialsIncluded": false
+  },
+  "network": {
+    "dateKST": "2026-11-15 15:51:57",
+    "remoteMethods": [
+      "GET"
+    ],
+    "validAuthenticatedRemoteRequestsPerformed": false,
+    "results": [
+      {
+        "label": "관리자 비로그인 조회",
+        "origin": "http://127.0.0.1:5173",
+        "path": "/api/admin/orders?storeId=store-default",
+        "method": "GET",
+        "requestHeaders": {
+          "Accept": "application/json"
+        },
+        "authorizationSent": false,
+        "requestBodyPresent": false,
+        "status": 500,
+        "elapsedMs": 704,
+        "responseHeaders": {
+          "content-type": "application/json",
+          "server": "nginx/1.31.0",
+          "date": "Sun, 15 Nov 2026 06:51:56 GMT"
+        },
+        "responseBody": {
+          "status": 500,
+          "message": "서버 오류가 발생했습니다.",
+          "timestamp": "2026-11-15T06:51:56.584484619"
+        },
+        "jsonKeys": [
+          "status",
+          "message",
+          "timestamp"
+        ],
+        "nonJsonTitle": null
+      },
+      {
+        "label": "명세 메뉴 조회",
+        "origin": "http://127.0.0.1:5173",
+        "path": "/api/menus",
+        "method": "GET",
+        "requestHeaders": {
+          "Accept": "application/json"
+        },
+        "authorizationSent": false,
+        "requestBodyPresent": false,
+        "status": 500,
+        "elapsedMs": 707,
+        "responseHeaders": {
+          "content-type": "application/json",
+          "server": "nginx/1.31.0",
+          "date": "Sun, 15 Nov 2026 06:51:56 GMT"
+        },
+        "responseBody": {
+          "status": 500,
+          "message": "서버 오류가 발생했습니다.",
+          "timestamp": "2026-11-15T06:51:56.588415197"
+        },
+        "jsonKeys": [
+          "status",
+          "message",
+          "timestamp"
+        ],
+        "nonJsonTitle": null
+      },
+      {
+        "label": "KDS 비로그인 조회",
+        "origin": "http://127.0.0.1:5173",
+        "path": "/api/kds/orders?storeId=store-default",
+        "method": "GET",
+        "requestHeaders": {
+          "Accept": "application/json"
+        },
+        "authorizationSent": false,
+        "requestBodyPresent": false,
+        "status": 500,
+        "elapsedMs": 731,
+        "responseHeaders": {
+          "content-type": "application/json",
+          "server": "nginx/1.31.0",
+          "date": "Sun, 15 Nov 2026 06:51:56 GMT"
+        },
+        "responseBody": {
+          "status": 500,
+          "message": "서버 오류가 발생했습니다.",
+          "timestamp": "2026-11-15T06:51:56.621843246"
+        },
+        "jsonKeys": [
+          "status",
+          "message",
+          "timestamp"
+        ],
+        "nonJsonTitle": null
+      },
+      {
+        "label": "명세 메뉴 조회",
+        "origin": "https://dku-voice.com",
+        "path": "/api/menus",
+        "method": "GET",
+        "requestHeaders": {
+          "Accept": "application/json"
+        },
+        "authorizationSent": false,
+        "requestBodyPresent": false,
+        "status": 500,
+        "elapsedMs": 750,
+        "responseHeaders": {
+          "content-type": "application/json",
+          "server": "nginx/1.31.0",
+          "date": "Sun, 15 Nov 2026 06:51:56 GMT"
+        },
+        "responseBody": {
+          "status": 500,
+          "message": "서버 오류가 발생했습니다.",
+          "timestamp": "2026-11-15T06:51:56.626340299"
+        },
+        "jsonKeys": [
+          "status",
+          "message",
+          "timestamp"
+        ],
+        "nonJsonTitle": null
+      },
+      {
+        "label": "공통 클라이언트 없는 최소 요청",
+        "origin": "https://dku-voice.com",
+        "path": "/api/menus",
+        "method": "GET",
+        "requestHeaders": {},
+        "authorizationSent": false,
+        "requestBodyPresent": false,
+        "status": 500,
+        "elapsedMs": 1129,
+        "responseHeaders": {
+          "content-type": "application/json",
+          "server": "nginx/1.31.0",
+          "date": "Sun, 15 Nov 2026 06:51:57 GMT"
+        },
+        "responseBody": {
+          "status": 500,
+          "message": "서버 오류가 발생했습니다.",
+          "timestamp": "2026-11-15T06:51:57.024467121"
+        },
+        "jsonKeys": [
+          "status",
+          "message",
+          "timestamp"
+        ],
+        "nonJsonTitle": null
+      },
+      {
+        "label": "관리자 비로그인 조회",
+        "origin": "https://dku-voice.com",
+        "path": "/api/admin/orders?storeId=store-default",
+        "method": "GET",
+        "requestHeaders": {
+          "Accept": "application/json"
+        },
+        "authorizationSent": false,
+        "requestBodyPresent": false,
+        "status": 500,
+        "elapsedMs": 1139,
+        "responseHeaders": {
+          "content-type": "application/json",
+          "server": "nginx/1.31.0",
+          "date": "Sun, 15 Nov 2026 06:51:57 GMT"
+        },
+        "responseBody": {
+          "status": 500,
+          "message": "서버 오류가 발생했습니다.",
+          "timestamp": "2026-11-15T06:51:57.030101341"
+        },
+        "jsonKeys": [
+          "status",
+          "message",
+          "timestamp"
+        ],
+        "nonJsonTitle": null
+      },
+      {
+        "label": "KDS 비로그인 조회",
+        "origin": "https://dku-voice.com",
+        "path": "/api/kds/orders?storeId=store-default",
+        "method": "GET",
+        "requestHeaders": {
+          "Accept": "application/json"
+        },
+        "authorizationSent": false,
+        "requestBodyPresent": false,
+        "status": 500,
+        "elapsedMs": 1143,
+        "responseHeaders": {
+          "content-type": "application/json",
+          "server": "nginx/1.31.0",
+          "date": "Sun, 15 Nov 2026 06:51:57 GMT"
+        },
+        "responseBody": {
+          "status": 500,
+          "message": "서버 오류가 발생했습니다.",
+          "timestamp": "2026-11-15T06:51:57.032432462"
+        },
+        "jsonKeys": [
+          "status",
+          "message",
+          "timestamp"
+        ],
+        "nonJsonTitle": null
+      },
+      {
+        "label": "Origin 포함 메뉴 조회",
+        "origin": "https://dku-voice.com",
+        "path": "/api/menus",
+        "method": "GET",
+        "requestHeaders": {
+          "Accept": "application/json",
+          "Origin": "http://127.0.0.1:5173"
+        },
+        "authorizationSent": false,
+        "requestBodyPresent": false,
+        "status": 500,
+        "elapsedMs": 1143,
+        "responseHeaders": {
+          "content-type": "application/json",
+          "server": "nginx/1.31.0",
+          "date": "Sun, 15 Nov 2026 06:51:57 GMT"
+        },
+        "responseBody": {
+          "status": 500,
+          "message": "서버 오류가 발생했습니다.",
+          "timestamp": "2026-11-15T06:51:57.036176261"
+        },
+        "jsonKeys": [
+          "status",
+          "message",
+          "timestamp"
+        ],
+        "nonJsonTitle": null
+      },
+      {
+        "label": "Swagger 주소",
+        "origin": "https://dku-voice.com",
+        "path": "/swagger-ui/index.html",
+        "method": "GET",
+        "requestHeaders": {},
+        "authorizationSent": false,
+        "requestBodyPresent": false,
+        "status": 301,
+        "elapsedMs": 203,
+        "responseHeaders": {
+          "server": "nginx/1.31.0",
+          "date": "Sun, 15 Nov 2026 06:51:57 GMT"
+        },
+        "responseBody": null,
+        "jsonKeys": null,
+        "nonJsonTitle": null
+      },
+      {
+        "label": "OpenAPI 주소",
+        "origin": "https://dku-voice.com",
+        "path": "/v3/api-docs",
+        "method": "GET",
+        "requestHeaders": {},
+        "authorizationSent": false,
+        "requestBodyPresent": false,
+        "status": 200,
+        "elapsedMs": 206,
+        "responseHeaders": {
+          "content-type": "text/html; charset=utf-8",
+          "server": "nginx/1.31.0",
+          "date": "Sun, 15 Nov 2026 06:51:57 GMT"
+        },
+        "responseBody": null,
+        "jsonKeys": null,
+        "nonJsonTitle": "Vite + React"
+      },
+      {
+        "label": "배포 프론트",
+        "origin": "https://dku-voice.com",
+        "path": "/",
+        "method": "GET",
+        "requestHeaders": {},
+        "authorizationSent": false,
+        "requestBodyPresent": false,
+        "status": 200,
+        "elapsedMs": 216,
+        "responseHeaders": {
+          "content-type": "text/html; charset=utf-8",
+          "server": "nginx/1.31.0",
+          "date": "Sun, 15 Nov 2026 06:51:57 GMT"
+        },
+        "responseBody": null,
+        "jsonKeys": null,
+        "nonJsonTitle": "Vite + React"
+      }
+    ],
+    "swaggerReturnsFrontendHtml": false,
+    "openApiReturnsFrontendHtml": true,
+    "swaggerRedirectChain": [
+      {
+        "url": "https://dku-voice.com/swagger-ui/index.html",
+        "status": 301,
+        "location": "https://dku-voice.com/swagger-ui/index",
+        "title": null,
+        "containsSwaggerUi": false
+      },
+      {
+        "url": "https://dku-voice.com/swagger-ui/index",
+        "status": 301,
+        "location": "https://dku-voice.com/swagger-ui",
+        "title": null,
+        "containsSwaggerUi": false
+      },
+      {
+        "url": "https://dku-voice.com/swagger-ui",
+        "status": 200,
+        "location": null,
+        "title": "Vite + React",
+        "containsSwaggerUi": false
+      }
+    ]
+  },
+  "localMockProxy": {
+    "test": "actual api client and project Vite proxy through local mock upstream",
+    "syntheticTokenOnly": true,
+    "remoteServiceContacted": false,
+    "emptyTokenBlockedBeforeNetwork": true,
+    "proxyPreservesApiPath": true,
+    "changeOriginWorks": true,
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/api/menus",
+        "accept": "application/json",
+        "authorizationPresent": false,
+        "authorizationMatchesSyntheticToken": false,
+        "contentType": null,
+        "bodyBytes": 0,
+        "host": "127.0.0.1:52268"
+      },
+      {
+        "method": "GET",
+        "url": "/api/menus?categoryId=1",
+        "accept": "application/json",
+        "authorizationPresent": false,
+        "authorizationMatchesSyntheticToken": false,
+        "contentType": null,
+        "bodyBytes": 0,
+        "host": "127.0.0.1:52268"
+      },
+      {
+        "method": "GET",
+        "url": "/api/kds/orders?storeId=store-default",
+        "accept": "application/json",
+        "authorizationPresent": true,
+        "authorizationMatchesSyntheticToken": true,
+        "contentType": null,
+        "bodyBytes": 0,
+        "host": "127.0.0.1:52268"
+      },
+      {
+        "method": "GET",
+        "url": "/api/admin/orders?storeId=store-default",
+        "accept": "application/json",
+        "authorizationPresent": true,
+        "authorizationMatchesSyntheticToken": true,
+        "contentType": null,
+        "bodyBytes": 0,
+        "host": "127.0.0.1:52268"
+      },
+      {
+        "method": "GET",
+        "url": "/api/admin/payments?storeId=store-default",
+        "accept": "application/json",
+        "authorizationPresent": true,
+        "authorizationMatchesSyntheticToken": true,
+        "contentType": null,
+        "bodyBytes": 0,
+        "host": "127.0.0.1:52268"
+      },
+      {
+        "method": "GET",
+        "url": "/api/admin/stats/sales?storeId=store-default&from=2026-11-15&to=2026-11-15",
+        "accept": "application/json",
+        "authorizationPresent": true,
+        "authorizationMatchesSyntheticToken": true,
+        "contentType": null,
+        "bodyBytes": 0,
+        "host": "127.0.0.1:52268"
+      },
+      {
+        "method": "GET",
+        "url": "/api/admin/stats/menus?storeId=store-default&from=2026-11-15&to=2026-11-15",
+        "accept": "application/json",
+        "authorizationPresent": true,
+        "authorizationMatchesSyntheticToken": true,
+        "contentType": null,
+        "bodyBytes": 0,
+        "host": "127.0.0.1:52268"
+      }
+    ]
+  },
+  "targetedApiTests": {
+    "passed": 19,
+    "failed": 0
+  }
+}

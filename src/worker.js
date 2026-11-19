@@ -10,9 +10,10 @@
 //
 //  메시지 프로토콜
 //    수신  { type: 'configure', sampleRate }            -- 샘플레이트 설정/재초기화
-//          { type: 'reduce-noise', pcm: Float32Array }  -- 디노이즈 요청
+//          { type: 'reduce-noise', pcm: Float32Array, generation } -- 디노이즈 요청
 //    송신  { type: 'engine-ready', engine }             -- 'wasm' | 'js-fallback'
-//          { type: 'noise-reduced', pcm: ArrayBuffer(Int16), sampleRate, engine }
+//          { type: 'noise-reduced', pcm: ArrayBuffer(Int16), sampleRate, engine, generation }
+// generation은 종료된 녹음 결과를 거르는 로컬 표식이며 AI 서버로 전송하지 않는다.
 // =============================================================================
 import wasmUrl from './wasm/noise-suppressor.wasm?url';
 
@@ -147,7 +148,7 @@ self.onmessage = async (event) => {
 
   const pcm16 = floatToInt16(denoised);
   self.postMessage(
-    { type: 'noise-reduced', pcm: pcm16.buffer, sampleRate: currentSampleRate, engine },
+    { type: 'noise-reduced', pcm: pcm16.buffer, sampleRate: currentSampleRate, engine, generation: data.generation },
     [pcm16.buffer],
   );
 };

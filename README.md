@@ -1,70 +1,42 @@
-# Getting Started with Create React App
+# DKU Voice 프론트엔드
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+React 18 · JavaScript · Vite 기반 음성인식 키오스크입니다. 기존 메뉴·장바구니·결제·KDS·관리자 화면에 최신 `/api` 규격을 연결합니다. 상태와 화면 전환은 `App.jsx`의 React hooks로 관리하며 별도 라우터는 사용하지 않습니다.
 
-## Available Scripts
+```sh
+npm ci
+npm run dev
+```
 
-In the project directory, you can run:
+일반 개발 화면은 **http://localhost:5173/** 로 접속하세요. 현재 백엔드는 이 출처를 허용하지만 `http://127.0.0.1:5173`의 Origin은 CORS 403으로 거절합니다. 같은 Mac을 가리켜도 브라우저에서는 다른 출처입니다. 공개 주문 API의 이 거절은 고객 로그인 만료를 뜻하지 않습니다. 별도의 로컬 모의 환경 주소는 아래 안내를 따릅니다.
 
-### `npm start`
+현재 작업 환경에는 테스트 클라이언트 키가 `.env.local`에 설정되어 있습니다. 새 환경에서는 `.env.example`을 참고하여 직접 설정하세요. 시크릿 키와 계정 비밀번호는 프론트 환경변수에 넣지 않습니다.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- 배포 API: `VITE_API_BASE_URL=`이면 `/api/...` 상대경로
+- 개발 프록시: `BACKEND_PROXY_TARGET=https://dku-voice.com` (로컬 백엔드 사용 시 `http://127.0.0.1:8080`)
+- 음성 연결: `VITE_AI_WS_URL=`이면 현재 host의 `/ws/audio`, HTTPS에서는 WSS
+- 카메라 나이 분석: `/ai/api/vision/analyze_age` 상대경로 사용. 기존 `/ai` 개발 프록시를 재사용하며 `VITE_AI_SNAPSHOT_URL`은 이 기능에 사용하지 않음
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```sh
+npm test
+npm run lint
+npm run build
+npm run preview
+```
 
-### `npm test`
+메뉴 화면은 서버에서 받은 메뉴만 표시합니다. 처음 조회에 실패하면 오류와 재시도를 안내하며 임시 상품을 표시하지 않습니다. 재조회 실패 시 마지막으로 받은 정보임을 안내하고 담기를 잠급니다. 일반 실행에서는 장바구니의 결제하기 → 서버 주문 준비 → 토스 위젯 자동 표시 → 결제하기 → 토스 인증 → 백엔드 승인 → PAID 영수증 순서로 연결됩니다. 테스트 위젯 키만 허용하며 시크릿 키는 백엔드가 사용합니다. 별도 테스트·과금 안내 배너는 앱에 추가하지 않았습니다. 토스 자체 UI의 표시는 토스에서 제공합니다.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+2026-11-16 확인 기준 메뉴 API는 HTTP 200과 판매 메뉴 17개를 반환합니다. 동일 옵션이 반복된 응답은 이름·타입·가격이 일치하는 경우에만 한 번씩 정리합니다. 같은 ID의 내용이 다르면 계속 차단합니다. 11월 17일 21:34 KST에는 주문 ID 4·7 조회도 HTTP 200으로 정상화됐으며 두 주문은 PENDING 상태였습니다. 실제 서버 데이터의 메뉴 변환·장바구니 구성은 확인했으며 전체 결제 성공은 아직 미검증입니다. 서버 키 쌍, 지원 결제수단, 실제 승인과 결제 복구 처리는 공동 테스트가 필요합니다. [현재 프론트 수정 내용과 남은 작업](docs/FRONTEND_FIXES_2026-11-15.md)을 참고하세요.
 
-### `npm run build`
+토스 인증 후 주문 조회에 실패하면 인증 결과를 보관합니다. 같은 주문의 `결제 계속하기` 또는 `결제 상태 확인`으로 이어지며, 승인 결과가 불명확한 요청은 자동 재승인하지 않습니다. 오류 화면에서 주문번호·주문 ID와 실패한 요청을 확인할 수 있습니다. 결과 확인 중에도 메뉴 담기·장바구니 편집은 가능하며, 새 주문의 결제는 기존 결과 확인 후 진행합니다. 결제 완료 시 해당 주문의 수량만 정리하고 나중에 추가한 메뉴는 유지합니다.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+실제 서버 검증 상태와 파일별 변경 내용은 [연동 보고서](docs/INTEGRATION_REPORT.md), 조회 응답 기록은 [API 확인 결과](docs/API_VERIFICATION.json)를 참고하세요. 보고서에서 확인하지 않은 API를 실제 연동 완료로 간주하지 마세요.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+백엔드 오류 중에도 화면에서 결제 흐름을 확인하려면 `npm run dev:mock`을 실행하고 `http://127.0.0.1:5174`에 접속하세요. [로컬 모의 결제 안내](docs/LOCAL_PAYMENT_TEST.md)를 참고하세요. 실제 백엔드·토스 연동 성공과는 별개의 테스트입니다.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+2026-11-19 메뉴/화면 점검에서는 실제 메뉴 17개의 표시와 이미지 주소를 대조했습니다. 추천은 판매 중이며 장바구니에 없는 서버 메뉴를 제시하는 목록으로, FP-Growth 구현이나 임의의 신뢰도를 표시하지 않습니다. 연령 화면도 무작위 예시를 만들지 않고 실제 수신 결과가 없으면 대기 상태를 안내합니다. [점검 결과와 백엔드 데이터 문제](docs/MENU_SCREEN_AUDIT_2026-11-19.md)를 참고하세요.
 
-### `npm run eject`
+카메라 나이 분석은 연령 화면에서 **카메라 켜기 → 촬영 후 분석**을 직접 선택하면 사진 한 장을 전송하고 추정 결과를 표시합니다. 배포된 OpenAPI에서 확인한 `POST`·multipart `file` 규격을 사용합니다. 촬영 직후 카메라를 종료하며 취소·화면 이동·페이지 숨김 시에도 자원을 정리합니다. 나이에 따른 자동 터치 전환 정책은 아직 확인되지 않아 적용하지 않았으며, 사용자가 **터치로 주문하기**를 직접 선택할 수 있습니다. 실제 장비의 촬영·AI 추론은 미검증입니다. [구현 범위·API 규격·남은 확인 사항](docs/AGE_CAMERA_2026-11-19.md)을 참고하세요.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+언어 버튼으로 한국어·일본어·스페인어·태국어를 선택할 수 있습니다. 화면 표시만 번역하며 메뉴/옵션 ID, 원본 상품 데이터, KRW 금액과 API 요청은 유지합니다. 미등록 번역은 원문으로 표시합니다. 음성 시작 후 최상위 `language`가 `ko`/`ja`/`es`/`th`로 확인되면 자동 전환합니다. 한국어 선택 시 응답 대기 5초에 터치 대체를 안내하고, 외국어 또는 발화 언어 미확인 시 12초까지 기다립니다. 한국어 5초 안내도 음성을 중단하지 않아 6~9초 외국어 결과를 받을 수 있습니다. 대기 12초가 지나면 해당 음성 연결을 종료하고 터치 주문·새 음성 시도를 안내하며 종료된 연결의 늦은 결과는 적용하지 않습니다. 녹음 중 시간과 구분하기 위해 로컬 PCM 활동/800ms 무음을 관찰하지만 서버 분석 시작을 확정하는 신호는 아닙니다. [타이머 개선과 검증 한계](docs/VOICE_WAIT_2026-11-19.md), [다국어 구현·검증 결과](docs/MULTILINGUAL_2026-11-19.md)를 참고하세요. 토스 외부 결제 UI 내부의 언어는 상점 설정/SDK 지원을 별도로 확인해야 합니다.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+TTS는 일본어·스페인어·태국어에서 브라우저와 운영체제가 제공하는 같은 언어 음성 중 Natural·Neural·Premium·Enhanced 계열을 우선 선택합니다. 이 Mac에서는 각각 Kyoko·Mónica·Kanya 계열의 고품질 설치 버전을 우선합니다. 음성 목록이 늦게 준비되면 최대 1.5초 기다리며, 선택한 음성을 재생할 수 없으면 같은 언어의 다음 음성과 브라우저 기본 음성 순서로 복구합니다. 외국어별 발화 속도만 소폭 조정하고 한국어 설정은 유지합니다. 실제 음질과 사용 가능한 목소리는 실행 기기의 설치 음성에 따라 달라지며, 웹 앱은 Safari가 노출하지 않은 Siri 음성을 직접 지정할 수 없습니다.
