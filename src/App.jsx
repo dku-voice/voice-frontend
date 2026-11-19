@@ -13,50 +13,20 @@ import { changedKdsIds, mergeKdsOrders } from './integration/kds-state.js';
 import { koreaToday } from './integration/date.js';
 import { assertTestWidgetKey, prepareTossWidget, readPaymentReturn } from './integration/payment.js';
 import { describePaymentError } from './integration/payment-error.js';
+import MenuImage from './components/MenuImage.jsx';
+import { availableRecommendations } from './domain/menu-display.js';
+import { readLanguage, storeLanguage, supportedLanguage, translate, localeFor, formatMoney, orderSummary } from './i18n/index.js';
+import { localizeTree } from './i18n/react.js';
+import LanguageSelector from './i18n/LanguageSelector.jsx';
+import { createVoiceWait, receiveVoiceMessage, createVoiceLanguageGuard, waitForVoiceSocket } from './integration/voice-language.js';
+import { isVoiceOrderResponse, normalizeVoiceOrderResponse } from './integration/voice-order.js';
+import { ageAnalysisApi } from './api/vision.js';
+import { createAgeCamera } from './integration/age-camera.js';
+import { rankTtsVoices, selectTtsVoice, ttsSettings, waitForTtsVoice } from './integration/tts.js';
 
 const AI_WS_URL = runtimeConfig.aiWsUrl;
 const LOCAL_MOCK_PAYMENT = import.meta.env.MODE === 'local-mock'
   && ['127.0.0.1', 'localhost'].includes(globalThis.window?.location?.hostname);
-
-const fallbackMenuCatalog = [
-  {
-    id: 'burger',
-    name: '버거',
-    items: [
-      { id: 'classic-burger', name: '클래식 버거', price: 5900, tags: ['burger', 'beef'], image: '🍔' },
-      { id: 'cheese-burger', name: '치즈 버거', price: 6900, tags: ['burger', 'cheese'], image: '🧀' },
-      { id: 'bulgogi-burger', name: '불고기 버거', price: 6500, tags: ['burger', 'bulgogi'], image: '🍔' },
-      { id: 'bacon-cheese-burger', name: '베이컨 치즈 버거', price: 7900, tags: ['burger', 'bacon', 'cheese'], image: '🥓' },
-      { id: 'double-bulgogi-burger', name: '더블 불고기 버거', price: 8500, tags: ['burger', 'bulgogi', 'double'], image: '🍔' },
-      { id: 'steak-burger', name: '스테이크 버거', price: 9900, tags: ['burger', 'steak'], image: '🥩' },
-      { id: 'chicken-burger', name: '치킨 버거', price: 6500, tags: ['burger', 'chicken'], image: '🍗' },
-    ],
-  },
-  {
-    id: 'side',
-    name: '사이드',
-    items: [
-      { id: 'fries', name: '감자튀김', price: 2500, tags: ['side', 'potato'], image: '🍟' },
-      { id: 'nuggets', name: '치킨너겟', price: 3500, tags: ['side', 'chicken'], image: '🍗' },
-      { id: 'onion-rings', name: '어니언링', price: 3200, tags: ['side', 'fried'], image: '🧅' },
-      { id: 'cheese-sticks', name: '치즈스틱', price: 3300, tags: ['side', 'cheese'], image: '🧀' },
-      { id: 'crispy-tender', name: '크리스피 텐더', price: 4200, tags: ['side', 'chicken'], image: '🍗' },
-    ],
-  },
-  {
-    id: 'drink',
-    name: '음료',
-    items: [
-      { id: 'cola', name: '콜라', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
-      { id: 'zero-cola', name: '제로 콜라', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
-      { id: 'lemonade', name: '레모네이드', price: 3000, tags: ['drink', 'fresh'], image: '🍋' },
-      { id: 'sprite', name: '스프라이트', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
-      { id: 'zero-sprite', name: '제로 스프라이트', price: 2000, tags: ['drink', 'soda'], image: '🥤' },
-      { id: 'orange-fanta', name: '오렌지 환타', price: 2000, tags: ['drink', 'soda'], image: '🍊' },
-      { id: 'grape-fanta', name: '포도 환타', price: 2000, tags: ['drink', 'soda'], image: '🍇' },
-    ],
-  },
-];
 
 const statusLabel = {
   connecting: '연결 중',
@@ -65,7 +35,6 @@ const statusLabel = {
   error: '오류',
 };
 
-const formatPrice = (value) => `${Number(value ?? 0).toLocaleString('ko-KR')}원`;
 const cleanName = (name) => String(name || '').replace(/\s/gu, '');
 const toKdsCard = (order) => {
   if (!Number.isSafeInteger(order?.orderId) || order.orderId <= 0 || !Array.isArray(order.items)) throw new Error('주문 응답 형식을 확인해 주세요.');
@@ -78,16 +47,22 @@ const toKdsCard = (order) => {
 };
 
 function App() {
+  const [language, setLanguage] = useState(readLanguage);
+  const languageRef = useRef(language);
+  languageRef.current = language;
+  const formatPrice = (value) => formatMoney(value, language);
   const checkoutRef = useRef(null);
   if (!checkoutRef.current) checkoutRef.current = createCheckoutManager({ api: kioskApi, storage: browserSessionStorage });
-  const [menuCatalog, setMenuCatalog] = useState(fallbackMenuCatalog);
+  const [menuCatalog, setMenuCatalog] = useState([]);
   const [adminMenuItems, setAdminMenuItems] = useState([]);
-  const [menuSource, setMenuSource] = useState('sample');
+  const [menuSource, setMenuSource] = useState('loading');
   const [menuLoading, setMenuLoading] = useState(true);
   const [menuError, setMenuError] = useState('');
   const [optionSelections, setOptionSelections] = useState({});
   const [currentScreen, setCurrentScreen] = useState('menu');
-  const [selectedCategory, setSelectedCategory] = useState(fallbackMenuCatalog[0].id);
+  const currentScreenRef = useRef(currentScreen);
+  currentScreenRef.current = currentScreen;
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [cart, setCart] = useState(() => checkoutRef.current.getSaved()?.phase === 'paid' ? [] : checkoutRef.current.restoreCart());
   const [recommendations, setRecommendations] = useState([]);
   const [kdsOrders, setKdsOrders] = useState([]);
@@ -97,8 +72,10 @@ function App() {
   const [message, setMessage] = useState('환영합니다. 음성 또는 화면 터치로 주문을 시작하세요.');
   const [error, setError] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [voiceFinalizing, setVoiceFinalizing] = useState(false);
   const [noiseEngine, setNoiseEngine] = useState('대기 중');
-  const [loading, setLoading] = useState(false);
+  const [cameraState, setCameraState] = useState({ phase: 'idle', error: null, result: null });
+  const [ageSource, setAgeSource] = useState('voice');
   const [aiResponsePending, setAiResponsePending] = useState(false);
   const [responseDelayTriggered, setResponseDelayTriggered] = useState(false);
   const [needSnapshotTouch, setNeedSnapshotTouch] = useState(false);
@@ -152,13 +129,20 @@ function App() {
   const workerRef = useRef(null);
   const wsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
-  const responseTimeoutRef = useRef(null);
-  const responseLoadingTimerRef = useRef(null);
+  const voiceWaitRef = useRef(null);
+  const voiceWaitSocketRef = useRef(null);
+  const voiceWaitLanguageRef = useRef(null);
+  const voiceStartAbortRef = useRef(null);
+  const voiceSessionRef = useRef(false);
+  const voiceEndSentRef = useRef(false);
+  const voiceLanguageGuardRef = useRef(null);
+  if (!voiceLanguageGuardRef.current) voiceLanguageGuardRef.current = createVoiceLanguageGuard();
   const ttsActiveRef = useRef(false);
   const ttsUtteranceRef = useRef(null);
+  const ttsVoicesRef = useRef([]);
+  const ttsRequestRef = useRef(0);
   const appMountedRef = useRef(false);
   const retryCountRef = useRef(0);
-  const awaitingAiRef = useRef(false);
   const aiMessageHandlerRef = useRef(null);
   const speakRef = useRef(null);
   const ttsEnabledRef = useRef(ttsEnabled);
@@ -186,7 +170,35 @@ function App() {
   menuItemsRef.current = allMenuItems;
   const menuSourceRef = useRef(menuSource);
   menuSourceRef.current = menuSource;
-  const snapshotCaptureInProgressRef = useRef(false);
+  const cameraRef = useRef(null);
+  const cameraContextActive = () => appMountedRef.current && currentScreenRef.current === 'ageResult'
+    && !voiceStartingRef.current && !voiceSessionRef.current && !voiceWaitRef.current?.active && !paymentBusyRef.current;
+  if (!cameraRef.current) cameraRef.current = createAgeCamera({
+    getVideo: () => videoRef.current,
+    analyze: (blob, options) => {
+      if (!cameraContextActive()) throw Object.assign(new Error('나이 분석 요청이 취소되었습니다.'), { name: 'AbortError' });
+      return ageAnalysisApi.analyze(blob, options);
+    },
+    onState: (next) => {
+      if (!cameraContextActive()) return;
+      setCameraState(next);
+      if (next.phase !== 'success') {
+        setAgeEstimate(null);
+        setAgeSource('camera');
+      }
+      const labels = { idle: '대기 중', opening: '카메라 준비 중', preview: '카메라 켜짐', capturing: '사진 준비 중',
+        analyzing: '나이 분석 중', success: '분석 완료', error: '분석 실패' };
+      setSnapshotStatus(labels[next.phase] || '대기 중');
+    },
+    onResult: (result) => {
+      if (!cameraContextActive()) return;
+      // No team policy is confirmed: isSenior/ageGroup must not select a mode.
+      setAgeSource('camera');
+      setAgeEstimate(result.estimatedAge);
+      speakRef.current?.('나이 분석이 완료되었습니다.');
+    },
+  });
+  const cameraProcessing = ['opening', 'capturing', 'analyzing'].includes(cameraState.phase);
 
   const totalPrice = useMemo(
     () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -203,6 +215,11 @@ function App() {
     [selectedCategory, menuCatalog],
   );
 
+  const visibleRecommendations = useMemo(
+    () => menuSource === 'server' ? availableRecommendations(recommendations, allMenuItems, cart) : [],
+    [recommendations, allMenuItems, cart, menuSource],
+  );
+
   const getPendingTossReturn = () => checkoutRef.current.getPendingTossReturn?.(
     paymentReturnRef.current?.type === 'success' ? paymentReturnRef.current : undefined,
   ) || null;
@@ -217,6 +234,12 @@ function App() {
 
   useEffect(() => {
     appMountedRef.current = true;
+    const refreshTtsVoices = () => {
+      const voices = window.speechSynthesis?.getVoices?.();
+      ttsVoicesRef.current = Array.isArray(voices) ? voices : [];
+    };
+    refreshTtsVoices();
+    window.speechSynthesis?.addEventListener?.('voiceschanged', refreshTtsVoices);
     loadMenus();
     workerRef.current = new Worker(new URL('./worker.js', import.meta.url), {
       type: 'module',
@@ -228,6 +251,7 @@ function App() {
         return;
       }
       if (data?.type === 'noise-reduced') {
+        if (!voiceSessionRef.current || data.generation !== voiceGenerationRef.current) return;
         setNoiseEngine(data.engine === 'wasm' ? 'WASM 모듈' : 'JS 폴백');
         sendAudioToServer(data.pcm);
       }
@@ -238,6 +262,7 @@ function App() {
     return () => {
       appMountedRef.current = false;
       menuRequestRef.current?.abort();
+      cameraRef.current?.cancel();
       if (wsRef.current) {
         wsRef.current.onclose = null;
         wsRef.current.onmessage = null;
@@ -248,9 +273,10 @@ function App() {
       workerRef.current?.terminate();
       wsRef.current?.close();
       clearTimeout(reconnectTimerRef.current);
-      clearTimeout(responseTimeoutRef.current);
-      clearTimeout(responseLoadingTimerRef.current);
+      voiceWaitRef.current?.finish();
+      ttsRequestRef.current += 1;
       window.speechSynthesis?.cancel();
+      window.speechSynthesis?.removeEventListener?.('voiceschanged', refreshTtsVoices);
     };
   }, []);
 
@@ -268,12 +294,6 @@ function App() {
     document.querySelector('#agreement-widget')?.replaceChildren();
   }, [cart]);
 
-  useEffect(() => {
-    if (!ageEstimate || paymentBusyRef.current || currentScreen === 'payment') return;
-    setCurrentScreen('ageResult');
-    speak(`예상 연령은 ${ageEstimate}세입니다. 연령대에 맞춘 추천 메뉴를 확인해 주세요.`);
-  }, [ageEstimate]);
-
   const addAuditLog = (event, detail, user = 'system') => {
     const now = new Date();
     const time = now.toLocaleString('ko-KR', {
@@ -285,7 +305,7 @@ function App() {
     });
 
     setAdminLogs((prev) => [
-      { id: Date.now(), time, event, user, detail },
+      { id: Date.now(), time, createdAt: now.toISOString(), event, user, detail },
       ...prev,
     ]);
   };
@@ -310,39 +330,81 @@ function App() {
 
   const speak = (text) => {
     setMessage(text);
+    const requestId = ++ttsRequestRef.current;
     if (!ttsEnabledRef.current || !('speechSynthesis' in window)) {
       // TTS 미사용 시에도 직전 재생으로 멈춰 둔 마이크는 복구한다.
       resumeMicAfterTts();
       return;
     }
 
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ko-KR';
+    const synthesis = window.speechSynthesis;
+    synthesis.cancel();
+    const language = languageRef.current;
+    const locale = localeFor(language);
+    const speech = ttsSettings(language);
+    const spokenText = translate(text, language);
 
-    utterance.onstart = () => pauseMicForTts();
-    const handleSpeechEnd = () => {
-      // 최신 멘트의 종료 이벤트일 때만 재개해, 연속 호출 시 조기 재개를 막는다.
-      if (ttsUtteranceRef.current === utterance) {
-        ttsUtteranceRef.current = null;
-        resumeMicAfterTts();
+    const prepare = async () => {
+      let availableVoices = ttsVoicesRef.current.length
+        ? ttsVoicesRef.current : synthesis.getVoices?.() || [];
+      let selectedVoice = selectTtsVoice(availableVoices, language, locale);
+      if (!selectedVoice && language !== 'ko') {
+        selectedVoice = await waitForTtsVoice(synthesis, language, locale);
+        availableVoices = synthesis.getVoices?.() || availableVoices;
+        ttsVoicesRef.current = availableVoices;
       }
-    };
-    utterance.onend = handleSpeechEnd;
-    utterance.onerror = handleSpeechEnd;
+      if (requestId !== ttsRequestRef.current || !ttsEnabledRef.current) return;
 
-    ttsUtteranceRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
+      const candidates = rankTtsVoices(availableVoices, language, locale) || [];
+      let candidateIndex = Math.max(0, candidates.indexOf(selectedVoice));
+      let defaultTried = false;
+      const play = (voice) => {
+        if (requestId !== ttsRequestRef.current) return;
+        const utterance = new SpeechSynthesisUtterance(spokenText);
+        utterance.lang = locale;
+        if (voice) utterance.voice = voice;
+        utterance.rate = speech.rate;
+        utterance.pitch = speech.pitch;
+        utterance.onstart = () => pauseMicForTts();
+        utterance.onend = () => {
+          if (ttsUtteranceRef.current !== utterance) return;
+          ttsUtteranceRef.current = null;
+          resumeMicAfterTts();
+        };
+        utterance.onerror = (event) => {
+          if (ttsUtteranceRef.current !== utterance || requestId !== ttsRequestRef.current) return;
+          const retryable = ['voice-unavailable', 'language-unavailable', 'synthesis-unavailable'].includes(event?.error);
+          if (retryable && voice && candidates[candidateIndex + 1]) {
+            candidateIndex += 1;
+            play(candidates[candidateIndex]);
+            return;
+          }
+          if (retryable && voice && !defaultTried) {
+            defaultTried = true;
+            play(null);
+            return;
+          }
+          ttsUtteranceRef.current = null;
+          resumeMicAfterTts();
+        };
+        ttsUtteranceRef.current = utterance;
+        synthesis.speak(utterance);
+      };
+      play(selectedVoice);
+    };
+    void prepare();
   };
 
   const connectWebSocket = () => {
-    if (!AI_WS_URL || !appMountedRef.current) return;
-    if ([WebSocket.OPEN, WebSocket.CONNECTING].includes(wsRef.current?.readyState)) return;
+    if (!AI_WS_URL || !appMountedRef.current) return null;
+    if ([WebSocket.OPEN, WebSocket.CONNECTING].includes(wsRef.current?.readyState)) return wsRef.current;
     clearTimeout(reconnectTimerRef.current);
     setWsStatus('connecting');
     const websocket = new WebSocket(AI_WS_URL);
     wsRef.current = websocket;
-    const current = () => appMountedRef.current && wsRef.current === websocket;
+    let receiving = true;
+    const ownsSocket = () => appMountedRef.current && wsRef.current === websocket;
+    const current = () => ownsSocket() && receiving;
     websocket.onopen = () => {
       if (!current()) return;
       retryCountRef.current = 0;
@@ -353,49 +415,107 @@ function App() {
     };
     websocket.onmessage = (event) => {
       if (!current()) return;
-      clearResponseDelay();
-      aiMessageHandlerRef.current?.(event.data);
+      aiMessageHandlerRef.current?.(event.data, websocket);
     };
     websocket.onerror = () => {
       if (!current()) return;
+      receiving = false;
+      stopVoiceStreaming(false);
       setWsStatus('error');
       setError('AI 서버 연결 중 오류가 발생했습니다. 화면 터치로 주문할 수 있습니다.');
+      websocket.close();
     };
     websocket.onclose = () => {
-      if (!current()) return;
+      if (!ownsSocket()) return;
+      receiving = false;
+      stopVoiceStreaming(false);
       setWsStatus('closed');
+      setError('AI 서버 연결 중 오류가 발생했습니다. 화면 터치로 주문할 수 있습니다.');
       if (retryCountRef.current >= 5) return;
       retryCountRef.current += 1;
       setRetryCount(retryCountRef.current);
       reconnectTimerRef.current = window.setTimeout(connectWebSocket, retryCountRef.current * 2000);
     };
+    return websocket;
   };
 
-  const handleAiMessage = (rawMessage) => {
+  const retireVoiceSocket = (socket) => {
+    if (!socket || wsRef.current !== socket) return;
+    wsRef.current = null;
+    clearTimeout(reconnectTimerRef.current);
+    socket.onopen = null; socket.onmessage = null; socket.onerror = null; socket.onclose = null;
+    socket.close();
+    setWsStatus('closed');
+  };
+
+  const handleAiMessage = (rawMessage, websocket) => {
     let data;
     try {
-      data = JSON.parse(rawMessage);
+      data = receiveVoiceMessage(rawMessage, {
+        voiceActive: voiceSessionRef.current, currentLanguage: languageRef.current, onLanguage: changeLanguage,
+        onLanguageDetected: (next) => voiceWaitRef.current.changeLanguage(next),
+        canApplyLanguage: () => voiceLanguageGuardRef.current.acceptResponse(websocket),
+      });
     } catch {
+      stopVoiceStreaming(false);
+      retireVoiceSocket(websocket);
       setError('AI 서버 응답 형식이 올바르지 않습니다.');
       addAuditLog('AI 응답 파싱 실패', String(rawMessage).slice(0, 80));
       return;
     }
+
+    if (isVoiceOrderResponse(data)) {
+      try {
+        const result = normalizeVoiceOrderResponse(data, menuItemsRef.current);
+        clearResponseDelay();
+        stopVoiceStreaming(false);
+        if (result.failed) {
+          setError('음성 주문을 처리하지 못했습니다. 다시 말씀하거나 화면 터치로 주문해 주세요.');
+          return;
+        }
+        if (result.recognizedText) setMessage(`인식 내용: ${result.recognizedText}`);
+        if (!result.items.length) {
+          setError('인식된 메뉴가 없습니다. 다시 말씀하거나 화면 터치로 주문해 주세요.');
+          return;
+        }
+        if (currentScreenRef.current === 'payment') return;
+        addVoiceOrderToCart(result.items);
+      } catch (failure) {
+        stopVoiceStreaming(false);
+        setError(failure.message || 'AI 서버 응답 형식이 올바르지 않습니다.');
+      }
+      return;
+    }
+
+    // Language metadata is not proof that analysis or a legacy order has completed.
+    if (data.type === 'order' && (!data.item || typeof data.item !== 'object' || Array.isArray(data.item))) {
+      stopVoiceStreaming(false);
+      retireVoiceSocket(websocket);
+      setError('AI 서버 응답 형식이 올바르지 않습니다.');
+      return;
+    }
+    if (['order', 'recommendation'].includes(data.type)) clearResponseDelay();
 
     if (data.type === 'order' && data.item && currentScreen !== 'payment') {
       addToCart(data.item);
     }
 
     if (data.type === 'age_estimate' && Number.isFinite(data.age) && data.age >= 0 && data.age <= 120) {
-      setAgeEstimate(data.age);
+      // Legacy WS estimates may be shown only on the already-open age screen.
+      // They never navigate or replace an explicit camera analysis result.
+      if (currentScreenRef.current === 'ageResult' && !cameraRef.current.busy && ageSource !== 'camera') {
+        clearResponseDelay();
+        setAgeEstimate(data.age);
+      }
     }
 
     if (data.type === 'recommendation') {
       const items = Array.isArray(data.items) ? data.items.map((item) => {
         const known = resolveMenu(item);
-        return known ? { ...known, confidence: item.confidence } : null;
+        return known || null;
       }).filter(Boolean) : [];
       setRecommendations(items);
-      if (!paymentBusyRef.current && currentScreen !== 'payment') setCurrentScreen('recommendations');
+      if (!paymentBusyRef.current && !['payment', 'ageResult'].includes(currentScreenRef.current)) setCurrentScreen('recommendations');
     }
 
     if (data.type === 'kds_status' && data.order) {
@@ -404,45 +524,98 @@ function App() {
     }
   };
 
-  // AI 서버 응답 지연 2단계 피드백
-  //   3초 초과 -> 로딩 피드백 표시 (사용자에게 처리 중임을 알림)
-  //   5초 초과 -> 터치 스냅샷 모드 전환 (오류 확인용 스냅샷 유도)
-  const startResponseDelayTimer = () => {
-    if (awaitingAiRef.current) return;
-    awaitingAiRef.current = true;
-    clearTimeout(responseLoadingTimerRef.current);
-    clearTimeout(responseTimeoutRef.current);
-    setAiResponsePending(false);
-    setResponseDelayTriggered(false);
-
-    responseLoadingTimerRef.current = window.setTimeout(() => {
+  // Local PCM activity estimates the end of speech; it is not a server analysis event.
+  if (!voiceWaitRef.current) voiceWaitRef.current = createVoiceWait({
+    onRecording: () => {
+      setAiResponsePending(false);
+      setResponseDelayTriggered(false);
+      setNeedSnapshotTouch(false);
+      setMessage('음성 인식을 시작했습니다. 원하는 메뉴를 말씀해 주세요.');
+    },
+    onWaiting: () => {
+      setMessage('음성 결과를 계속 기다리고 있습니다. 화면 터치로도 주문할 수 있습니다.');
+    },
+    onUtteranceEnd: () => sendVoiceEnd(),
+    onPending: () => {
       setAiResponsePending(true);
       addAuditLog('AI 응답 지연', '3초 초과, 로딩 피드백 표시');
-    }, 3000);
-
-    responseTimeoutRef.current = window.setTimeout(() => {
+    },
+    onTouch: ({ deadline }) => {
       setResponseDelayTriggered(true);
-      setNeedSnapshotTouch(true);
-      speak('AI 서버 응답이 지연되고 있습니다. 화면을 터치하면 오류 확인용 스냅샷을 전송합니다.');
-      addAuditLog('AI 응답 지연', '5초 초과, 터치 스냅샷 요청');
-    }, 5000);
+      setAiResponsePending(false);
+      // Touch is offered without interrupting recognition or opening a camera.
+      setNeedSnapshotTouch(false);
+      // Do not start TTS here: it would pause the mic during a long foreign utterance.
+      setMessage('음성 결과를 계속 기다리고 있습니다. 화면 터치로도 주문할 수 있습니다.');
+      addAuditLog('AI 응답 지연', `${deadline / 1000}초 초과, 터치 주문 안내`);
+    },
+    onTimeout: () => {
+      const socket = voiceWaitSocketRef.current;
+      stopVoiceStreaming(false);
+      retireVoiceSocket(socket);
+      setResponseDelayTriggered(true);
+      setNeedSnapshotTouch(Boolean(runtimeConfig.aiSnapshotUrl));
+      const message = '음성 응답 대기 시간이 초과되었습니다. 화면 터치로 주문하거나 음성 시작을 눌러 다시 시도해 주세요.';
+      setMessage(message);
+      setError(message);
+    },
+  });
+  const startResponseDelayTimer = (pcm) => {
+    voiceWaitSocketRef.current = wsRef.current;
+    voiceWaitRef.current.audio(pcm, voiceWaitLanguageRef.current);
   };
-
   const clearResponseDelay = () => {
-    awaitingAiRef.current = false;
-    clearTimeout(responseLoadingTimerRef.current);
-    clearTimeout(responseTimeoutRef.current);
+    voiceWaitRef.current.finish();
+    voiceWaitSocketRef.current = null;
     setAiResponsePending(false);
     setResponseDelayTriggered(false);
     setNeedSnapshotTouch(false);
   };
+  const changeLanguage = (next) => {
+    if (!supportedLanguage(next) || next === languageRef.current) return;
+    voiceWaitLanguageRef.current = null;
+    languageRef.current = next;
+    setLanguage(next);
+    storeLanguage(next);
+    voiceWaitRef.current.changeLanguage(null);
+    setResponseDelayTriggered(false);
+    setNeedSnapshotTouch(false);
+    window.speechSynthesis?.cancel();
+    ttsUtteranceRef.current = null;
+    resumeMicAfterTts();
+  };
+  const selectLanguageManually = (next) => {
+    if (!supportedLanguage(next)) return;
+    // Even selecting the current language overrides an older voice request.
+    voiceLanguageGuardRef.current.manualSelection();
+    changeLanguage(next);
+    voiceWaitLanguageRef.current = next;
+    voiceWaitRef.current.changeLanguage(next);
+    setResponseDelayTriggered(false);
+    setNeedSnapshotTouch(false);
+  };
+  useEffect(() => { document.documentElement.lang = language; }, [language]);
 
   const startVoiceStreaming = async () => {
     if (streamRef.current || voiceStartingRef.current || paymentBusyRef.current) return;
+    cancelCamera();
     voiceStartingRef.current = true;
+    voiceEndSentRef.current = false;
+    setVoiceFinalizing(false);
+    clearResponseDelay();
+    if (wsRef.current && voiceLanguageGuardRef.current.hasPending(wsRef.current)) retireVoiceSocket(wsRef.current);
+    const startController = new AbortController();
+    voiceStartAbortRef.current = startController;
     const generation = ++voiceGenerationRef.current;
+    voiceLanguageGuardRef.current.startSession();
     const current = () => appMountedRef.current && voiceGenerationRef.current === generation;
+    let microphoneRequested = false;
     try {
+      const socket = connectWebSocket();
+      if (!socket) throw new Error('AI 서버 연결 중 오류가 발생했습니다. 화면 터치로 주문할 수 있습니다.');
+      await waitForVoiceSocket(socket, { signal: startController.signal });
+      if (!current()) return;
+      microphoneRequested = true;
       const audioStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
@@ -483,28 +656,38 @@ function App() {
       // 캡처된 PCM 프레임 -> Web Worker(WASM 노이즈 캔슬링) -> AI 서버
       workletNode.port.onmessage = (event) => {
         // 에코 루프 방지: TTS 안내 멘트 재생 중 캡처된 프레임은 전송하지 않는다.
-        if (ttsActiveRef.current) return;
+        if (ttsActiveRef.current || !current()) return;
         const frame = event.data;
-        workerRef.current?.postMessage({ type: 'reduce-noise', pcm: frame }, [frame.buffer]);
+        workerRef.current?.postMessage({ type: 'reduce-noise', pcm: frame, generation }, [frame.buffer]);
       };
 
       source.connect(workletNode);
       workletNode.connect(audioContext.destination); // 무음 출력, 그래프 활성 유지
 
+      voiceSessionRef.current = true;
       setIsRecording(true);
       setError('');
       speak('음성 인식을 시작했습니다. 원하는 메뉴를 말씀해 주세요.');
     } catch (failure) {
       if (!current()) return;
       stopVoiceStreaming(false);
+      if (!microphoneRequested) retireVoiceSocket(wsRef.current);
       setError(failure.message || '마이크 권한이 필요합니다. 브라우저 권한을 허용한 뒤 다시 시도하세요.');
-      speak('마이크 권한 또는 오디오 설정을 확인해 주세요.');
+      speak(microphoneRequested ? '마이크 권한 또는 오디오 설정을 확인해 주세요.' : 'AI 서버 연결 중 오류가 발생했습니다. 화면 터치로 주문할 수 있습니다.');
     } finally {
-      if (voiceGenerationRef.current === generation) voiceStartingRef.current = false;
+      if (voiceGenerationRef.current === generation) {
+        voiceStartingRef.current = false;
+        voiceStartAbortRef.current = null;
+      }
     }
   };
 
   const stopVoiceStreaming = (announce = true) => {
+    voiceStartAbortRef.current?.abort();
+    voiceStartAbortRef.current = null;
+    voiceSessionRef.current = false;
+    voiceEndSentRef.current = false;
+    voiceLanguageGuardRef.current.stopSession();
     voiceGenerationRef.current += 1;
     voiceStartingRef.current = false;
     if (workletNodeRef.current) {
@@ -522,19 +705,48 @@ function App() {
     streamRef.current = null;
     clearResponseDelay();
     setIsRecording(false);
-    if (announce) speak('음성 인식을 종료했습니다.');
+    setVoiceFinalizing(false);
+    if (announce) {
+      retireVoiceSocket(wsRef.current);
+      speak('음성 인식을 종료했습니다.');
+    }
+  };
+
+  const sendVoiceEnd = () => {
+    const socket = wsRef.current;
+    if (!voiceSessionRef.current || voiceEndSentRef.current || socket?.readyState !== WebSocket.OPEN) return false;
+    try {
+      socket.send('END');
+      voiceEndSentRef.current = true;
+      setVoiceFinalizing(true);
+      setMessage('음성 분석 결과를 기다리고 있습니다.');
+      return true;
+    } catch {
+      stopVoiceStreaming(false);
+      retireVoiceSocket(socket);
+      setError('AI 서버에 녹음 종료 신호를 전송하지 못했습니다. 다시 시도해 주세요.');
+      return false;
+    }
+  };
+
+  const finishVoiceStreaming = () => {
+    if (!sendVoiceEnd()) return;
+    setIsRecording(false);
   };
 
   const sendAudioToServer = async (buffer) => {
-    if (!buffer) return;
-
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(buffer);
-      startResponseDelayTimer();
-      return;
+    if (!buffer || !voiceSessionRef.current || voiceEndSentRef.current) return;
+    const socket = wsRef.current;
+    try {
+      if (socket?.readyState !== WebSocket.OPEN) throw new Error('socket not open');
+      socket.send(buffer);
+      voiceLanguageGuardRef.current.audioSent(socket);
+      startResponseDelayTimer(buffer);
+    } catch {
+      stopVoiceStreaming(false);
+      retireVoiceSocket(socket);
+      setError('AI 서버가 연결되지 않아 음성 데이터는 전송하지 못했습니다.');
     }
-
-    setError('AI 서버가 연결되지 않아 음성 데이터는 전송하지 못했습니다.');
   };
 
   const resolveMenu = (candidate) => {
@@ -551,11 +763,28 @@ function App() {
       if (menuSourceRef.current !== 'server') throw new Error('서버 메뉴를 불러온 뒤 주문할 수 있습니다.');
       const menu = resolveMenu(candidate);
       if (!menu) throw new Error('주문할 메뉴를 서버 목록에서 확인할 수 없습니다.');
-      const item = createCartItem(menu, optionSelections[menu.menuId] || candidate.optionIds || []);
+      const optionIds = Array.isArray(candidate.optionIds) ? candidate.optionIds : optionSelections[menu.menuId] || [];
+      const item = createCartItem(menu, optionIds, candidate.quantity ?? 1);
       checkoutRef.current.clearPaid();
       setCart((prev) => addCartItem(prev, item));
       setError('');
       speak(`${item.name}을 장바구니에 담았습니다.`);
+    } catch (failure) { setError(failure.message); }
+  };
+
+  const addVoiceOrderToCart = (candidates) => {
+    if (paymentBusyRef.current) return;
+    try {
+      if (menuSourceRef.current !== 'server') throw new Error('서버 메뉴를 불러온 뒤 주문할 수 있습니다.');
+      const items = candidates.map((candidate) => {
+        const menu = resolveMenu(candidate);
+        if (!menu) throw new Error('주문할 메뉴를 서버 목록에서 확인할 수 없습니다.');
+        return createCartItem(menu, candidate.optionIds, candidate.quantity);
+      });
+      checkoutRef.current.clearPaid();
+      setCart((previous) => items.reduce((next, item) => addCartItem(next, item), previous));
+      setError('');
+      speak(`${items.map((item) => `${item.name} ${item.quantity}개`).join(', ')}를 장바구니에 담았습니다.`);
     } catch (failure) { setError(failure.message); }
   };
 
@@ -579,106 +808,54 @@ function App() {
     });
   };
 
-  const buildRecommendations = (cartItems) => {
-    const menus = menuItemsRef.current.filter((item) => item.status === 'ACTIVE');
-    if (!cartItems.length) return menus.slice(0, 3);
-    const samples = fallbackMenuCatalog.flatMap((category) => category.items);
-    const serverForSlug = (slug) => menus.find((item) => cleanName(item.name) === cleanName(samples.find((sample) => sample.id === slug)?.name));
+  const buildRecommendations = (cartItems) =>
+    availableRecommendations(menuItemsRef.current, menuItemsRef.current, cartItems).slice(0, 3);
 
-    const cartIds = new Set(cartItems.map((item) => item.menuId));
-    const rules = [
-      { when: ['classic-burger'], then: 'fries', confidence: 0.82 },
-      { when: ['cheese-burger'], then: 'cola', confidence: 0.78 },
-      { when: ['bulgogi-burger'], then: 'sprite', confidence: 0.77 },
-      { when: ['bacon-cheese-burger'], then: 'onion-rings', confidence: 0.76 },
-      { when: ['double-bulgogi-burger'], then: 'cheese-sticks', confidence: 0.79 },
-      { when: ['steak-burger'], then: 'crispy-tender', confidence: 0.81 },
-      { when: ['chicken-burger'], then: 'nuggets', confidence: 0.74 },
-      { when: ['fries', 'nuggets'], then: 'zero-cola', confidence: 0.71 },
-      { when: ['cheese-sticks', 'crispy-tender'], then: 'zero-sprite', confidence: 0.72 },
-      { when: ['cola', 'zero-cola'], then: 'fries', confidence: 0.68 },
-      { when: ['sprite', 'zero-sprite'], then: 'cheese-sticks', confidence: 0.66 },
-      { when: ['orange-fanta', 'grape-fanta'], then: 'crispy-tender', confidence: 0.65 },
-    ];
-
-    const matched = rules
-      .filter((rule) => rule.when.some((slug) => cartIds.has(serverForSlug(slug)?.menuId)))
-      .map((rule) => ({ menu: serverForSlug(rule.then), confidence: rule.confidence }))
-      .filter(({ menu }) => menu && !cartIds.has(menu.menuId))
-      .map(({ menu, confidence }) => ({ ...menu, confidence }));
-    return matched.length ? [...new Map(matched.map((item) => [item.menuId, item])).values()]
-      : menus.filter((item) => !cartIds.has(item.menuId)).slice(0, 3);
+  const cancelCamera = () => {
+    cameraRef.current.cancel();
+    if (!appMountedRef.current) return;
+    setCameraState({ phase: 'idle', error: null, result: null });
+    setAgeEstimate(null);
+    setAgeSource('voice');
+    setSnapshotStatus('대기 중');
   };
-
-  const captureSnapshot = async () => {
-    if (snapshotCaptureInProgressRef.current || paymentBusyRef.current) return;
-    if (!runtimeConfig.aiSnapshotUrl) {
-      setSnapshotStatus('연결 확인 필요');
-      setError('사진 분석 서버의 요청 형식과 주소를 확인하고 있습니다.');
-      setNeedSnapshotTouch(false);
+  const openAgeAnalysis = () => {
+    if (paymentBusyRef.current) {
+      setError('결제 처리 중에는 카메라 분석을 시작할 수 없습니다.');
       return;
     }
-
-    let videoStream;
-    try {
-      snapshotCaptureInProgressRef.current = true;
-      setLoading(true);
-      setSnapshotStatus('카메라 준비 중');
-      videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-
-      if (!videoRef.current) return;
-      videoRef.current.srcObject = videoStream;
-      await videoRef.current.play();
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 480;
-      canvas.getContext('2d').drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.86));
-      const formData = new FormData();
-      formData.append('snapshot', blob, `snapshot-${Date.now()}.jpg`);
-
-      setSnapshotStatus('서버 전송 중');
-      const response = await fetch(runtimeConfig.aiSnapshotUrl, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error('snapshot failed');
-
-      setSnapshotStatus('전송 완료');
-      speak('오류 확인용 스냅샷을 전송했습니다.');
-      addAuditLog('스냅샷 전송', 'AI 서버 지연 상황 캡처 완료');
-      clearResponseDelay();
-    } catch (err) {
-      setNeedSnapshotTouch(false);
-      setAiResponsePending(false);
-      setResponseDelayTriggered(false);
-
-      const isPermissionDenied =
-        err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
-
-      if (isPermissionDenied) {
-        setSnapshotStatus('카메라 권한 거부됨');
-        setError('카메라 권한이 거부되어 자동 스냅샷 요청을 중지했습니다.');
-        speak('카메라 권한이 거부되어 스냅샷 요청을 중지했습니다.');
-      } else {
-        setSnapshotStatus('전송 실패');
-        setError('카메라 권한 또는 AI 서버 연결을 확인해 주세요.');
-        speak('스냅샷 전송에 실패했습니다.');
-      }
-    } finally {
-      videoStream?.getTracks().forEach((track) => track.stop());
-      snapshotCaptureInProgressRef.current = false;
-      setLoading(false);
+    if (voiceStartingRef.current || voiceSessionRef.current || voiceWaitRef.current.active) {
+      setError('음성 인식을 중지한 뒤 카메라 분석을 시작해 주세요.');
+      return;
     }
+    cancelCamera();
+    setCurrentScreen('ageResult');
   };
-
-  const handleTouchSnapshot = () => {
-    if (currentScreen === 'menu' && needSnapshotTouch) captureSnapshot();
+  const openCamera = () => { if (cameraContextActive()) cameraRef.current.open(); };
+  const analyzeCamera = () => { if (cameraContextActive()) cameraRef.current.analyze(); };
+  const chooseTouchOrder = () => {
+    cancelCamera();
+    if (voiceStartingRef.current || voiceSessionRef.current || voiceWaitRef.current.active) {
+      stopVoiceStreaming(false);
+      retireVoiceSocket(wsRef.current);
+    }
+    setCurrentScreen('menu');
   };
+  useEffect(() => {
+    if (currentScreen !== 'ageResult') { cancelCamera(); return undefined; }
+    const hidden = () => { if (document.visibilityState === 'hidden') cancelCamera(); };
+    const leave = () => cancelCamera();
+    document.addEventListener('visibilitychange', hidden);
+    window.addEventListener('pagehide', leave);
+    return () => {
+      document.removeEventListener('visibilitychange', hidden);
+      window.removeEventListener('pagehide', leave);
+      cancelCamera();
+    };
+  }, [currentScreen]);
+  useEffect(() => {
+    if (isRecording || checkoutBusy || isPaymentWidgetLoading) cancelCamera();
+  }, [isRecording, checkoutBusy, isPaymentWidgetLoading]);
 
   const submitOrderToKds = () => { if (cart.length && !paymentBusyRef.current) setCurrentScreen('payment'); };
 
@@ -699,11 +876,6 @@ function App() {
       addAuditLog('KDS 상태 변경', `${id} → ${orderStatusLabel(status)}`, sessionRef.current.role);
     } catch (failure) { setKdsError(failure.message); }
     finally { kdsActionRef.current = false; setKdsUpdating(null); }
-  };
-
-  const simulateAgeEstimate = () => {
-    const age = [18, 24, 32, 46, 61][Math.floor(Math.random() * 5)];
-    setAgeEstimate(age);
   };
 
   const finishPayment = (order) => {
@@ -904,6 +1076,8 @@ function App() {
     const controller = new AbortController();
     menuRequestRef.current = controller;
     setMenuLoading(true);
+    menuSourceRef.current = 'loading';
+    setMenuSource('loading');
     setMenuError('');
     try {
       const menus = normalizeMenus(await kioskApi.fetchMenus({ signal: controller.signal }));
@@ -912,11 +1086,16 @@ function App() {
       adminMenuItemsRef.current = menus;
       setAdminMenuItems(menus);
       setMenuCatalog(categories);
+      menuSourceRef.current = 'server';
       setMenuSource('server');
       setSelectedCategory((selected) => categories.some((category) => category.id === selected) ? selected : categories[0]?.id || '');
       setOptionSelections({});
     } catch (failure) {
-      if (!controller.signal.aborted && appMountedRef.current) setMenuError(`메뉴 서버: ${failure.message}`);
+      if (!controller.signal.aborted && appMountedRef.current) {
+        menuSourceRef.current = 'error';
+        setMenuSource('error');
+        setMenuError(`메뉴 서버: ${failure.message}`);
+      }
     } finally {
       if (!controller.signal.aborted && appMountedRef.current) setMenuLoading(false);
     }
@@ -1122,7 +1301,7 @@ function App() {
 
   const refundPayment = async (payment) => {
     if (adminActionRef.current || sessionRef.current?.role !== 'ADMIN' || payment.pgProvider !== 'TEST') return;
-    if (!window.confirm('이 결제를 취소하시겠습니까?')) return;
+    if (!window.confirm(translate('이 결제를 취소하시겠습니까?', languageRef.current))) return;
     adminActionRef.current = true;
     setAdminAction(`payment-${payment.paymentId}`);
     setAdminError('');
@@ -1154,9 +1333,7 @@ function App() {
     finally { setReceiptBusy(false); }
   };
 
-  const renderMenuImage = (item) => item.imageUrl
-    ? <img src={item.imageUrl} alt={item.name} loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
-    : item.image;
+  const renderMenuImage = (item) => <MenuImage key={item.imageUrl || 'missing'} item={item} language={language} />;
 
   const renderMenuOptions = (item) => {
     if (!item.options?.length && !item.allergens?.length && !item.nutrient) return null;
@@ -1178,11 +1355,11 @@ function App() {
 
   const renderLogin = (screen) => <div className="login-panel">
     {session ? <>
-      <p>{session.role === 'ADMIN' ? '관리자' : '직원'}로 로그인되어 있습니다.</p>
+      <p>{`${session.role === 'ADMIN' ? '관리자' : '직원'}로 로그인되어 있습니다.`}</p>
       <button type="button" disabled={authBusy || adminAction !== null || kdsUpdating !== null} onClick={logout}>로그아웃</button>
       {screen === 'admin' && session.role !== 'ADMIN' && <p className="error">관리자 권한이 필요합니다.</p>}
     </> : <form onSubmit={login} className="login-form">
-      <p>{screen === 'admin' ? '관리자' : '주방 직원'} 로그인이 필요합니다.</p>
+      <p>{`${screen === 'admin' ? '관리자' : '주방 직원'} 로그인이 필요합니다.`}</p>
       <label>아이디 <input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
       <label>비밀번호 <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
       <button type="submit" className="primary" disabled={authBusy}>{authBusy ? '처리 중...' : '로그인'}</button>
@@ -1241,6 +1418,7 @@ function App() {
       <div>
         <p className="eyebrow">VOICE KIOSK</p>
         <h1>음성 인식 키오스크</h1>
+        <LanguageSelector language={language} onChange={selectLanguageManually} />
       </div>
       <nav className="nav-buttons" aria-label="화면 이동">
         {[
@@ -1254,7 +1432,7 @@ function App() {
             key={screen}
             disabled={checkoutBusy}
             className={currentScreen === screen ? 'active' : ''}
-            onClick={() => { if (!paymentBusyRef.current) setCurrentScreen(screen); }}
+            onClick={() => { if (!paymentBusyRef.current) { cancelCamera(); setCurrentScreen(screen); } }}
           >
             {label}
           </button>
@@ -1271,7 +1449,7 @@ function App() {
       </div>
       <div>TTS 안내: {ttsEnabled ? '켜짐' : '꺼짐'}</div>
       <div>노이즈 캔슬링: {noiseEngine}</div>
-      <div>스냅샷: {snapshotStatus}</div>
+      <div>카메라: {snapshotStatus}</div>
       {aiResponsePending && !responseDelayTriggered && (
         <span className="pending-tag">AI 응답 대기 중…</span>
       )}
@@ -1288,15 +1466,17 @@ function App() {
         {error && <p className="error" role="alert">{error}</p>}
         {menuLoading && <p role="status">메뉴를 불러오는 중입니다.</p>}
         {menuError && <p className="error" role="alert">{menuError}</p>}
-        {menuSource !== 'server' && !menuLoading && <p className="hint">예시 메뉴입니다. 서버 메뉴를 불러온 뒤 주문할 수 있습니다.</p>}
+        {menuSource !== 'server' && !menuLoading && <p className="hint">{menuCatalog.length
+          ? '표시된 메뉴는 마지막으로 불러온 정보입니다. 서버 메뉴를 다시 불러온 뒤 주문할 수 있습니다.'
+          : '서버 메뉴를 다시 불러온 뒤 주문할 수 있습니다.'}</p>}
         <button type="button" disabled={menuLoading || checkoutBusy} onClick={loadMenus}>메뉴 다시 불러오기</button>
-        {needSnapshotTouch && <p className="hint">화면을 한 번 터치하면 오류 확인용 스냅샷을 전송합니다.</p>}
+        {needSnapshotTouch && <p className="hint">화면 터치로 주문할 수 있습니다. 카메라 분석은 별도로 선택할 수 있습니다.</p>}
         <div className="action-row">
-          <button className="primary" onClick={isRecording ? stopVoiceStreaming : startVoiceStreaming}>
-            {isRecording ? '음성 중지' : '음성 시작'}
+          <button className="primary" disabled={voiceFinalizing} onClick={isRecording ? finishVoiceStreaming : startVoiceStreaming}>
+            {voiceFinalizing ? '음성 처리 중…' : isRecording ? '음성 중지' : '음성 시작'}
           </button>
-          <button onClick={captureSnapshot}>스냅샷 캡처</button>
-          <button disabled={checkoutBusy} onClick={simulateAgeEstimate}>연령 추정</button>
+          <button disabled={checkoutBusy || isRecording} onClick={openAgeAnalysis}>카메라 나이 분석</button>
+          <button disabled={checkoutBusy || isRecording} onClick={openAgeAnalysis}>연령 추정</button>
         </div>
       </section>
 
@@ -1312,6 +1492,7 @@ function App() {
             </button>
           ))}
         </div>
+        {!menuLoading && !menuError && menuSource === 'server' && !selectedItems.length && <p className="empty">현재 표시할 판매 메뉴가 없습니다.</p>}
         <div className="item-grid">
           {selectedItems.map((item) => (
             <article key={item.id} className={`item-card ${item.status === 'SOLD_OUT' ? 'sold-out' : ''}`}>
@@ -1369,16 +1550,17 @@ function App() {
   const renderRecommendations = () => (
     <main className="screen">
       <div className="screen-heading">
-        <h2>FP-Growth 추천 메뉴</h2>
-        <p>장바구니 조합을 기준으로 함께 구매할 가능성이 높은 메뉴를 보여줍니다.</p>
+        <h2>추천 메뉴</h2>
+        <p>현재 판매 중이며 장바구니에 없는 메뉴를 보여줍니다.</p>
       </div>
+      {menuSource !== 'server' && <p className="hint">서버 메뉴를 불러온 뒤 추천 메뉴를 확인할 수 있습니다.</p>}
+      {menuSource === 'server' && !visibleRecommendations.length && <p className="empty">현재 추가로 추천할 판매 메뉴가 없습니다.</p>}
       <div className="recommendation-list">
-        {recommendations.map((item) => (
+        {visibleRecommendations.map((item) => (
           <article key={item.id} className="recommendation-card">
             <div className="item-image">{renderMenuImage(item)}</div>
             <h3>{item.name}</h3>
             <p>{formatPrice(item.price)}</p>
-            <small>신뢰도 {Math.round((item.confidence || 0.64) * 100)}%</small>
             <button className="primary" disabled={menuSource !== 'server' || item.status !== 'ACTIVE' || checkoutBusy} onClick={() => addToCart(item)}>장바구니 담기</button>
           </article>
         ))}
@@ -1435,13 +1617,26 @@ function App() {
   const renderAgeResult = () => (
     <main className="screen age-result">
       <h2>연령 추정 결과</h2>
-      <p className="age-number">{ageEstimate}세</p>
-      <p>추정 결과에 따라 고대비 UI와 추천 화면으로 빠르게 이동할 수 있습니다.</p>
-      <p className="hint">AI 분석 연결 전의 예시 결과입니다.</p>
+      <p className="age-number">{Number.isFinite(ageEstimate) ? `${ageEstimate}세` : '결과 대기'}</p>
+      <p>고대비 UI를 켜거나 판매 중인 메뉴를 확인할 수 있습니다.</p>
+      <p className="hint">{Number.isFinite(ageEstimate)
+        ? ageSource === 'camera' ? '카메라 분석 결과는 추정값이며 실제 나이와 다를 수 있습니다.' : '음성 서버에서 수신한 연령 추정 결과입니다.'
+        : '카메라를 켠 뒤 촬영 후 분석을 눌러 주세요.'}</p>
+      <p className="hint">촬영 후 분석을 누르면 사진 한 장을 나이 분석 서버로 전송합니다. 사진은 이 기기에 저장하지 않습니다.</p>
+      <p className="hint">나이에 따른 자동 모드 전환은 적용하지 않습니다. 터치 주문은 직접 선택할 수 있습니다.</p>
+      <video ref={videoRef} className="camera-preview" hidden={!['opening', 'preview', 'capturing'].includes(cameraState.phase)}
+        muted playsInline aria-label="카메라 미리보기" />
+      <p role="status" aria-live="polite">카메라: {snapshotStatus}</p>
+      {cameraState.error && <p className="error" role="alert">{cameraState.error.message}</p>}
+      <div className="action-row">
+        <button onClick={openCamera} disabled={cameraProcessing || cameraState.phase === 'preview'}>카메라 켜기</button>
+        <button className="primary" onClick={analyzeCamera} disabled={cameraState.phase !== 'preview'}>촬영 후 분석</button>
+        <button onClick={cancelCamera} disabled={cameraState.phase === 'idle'}>카메라 종료 · 취소</button>
+      </div>
       <div className="action-row">
         <button onClick={() => setHighContrast(true)}>고대비 UI 켜기</button>
-        <button onClick={() => setCurrentScreen('recommendations')}>추천 메뉴 보기</button>
-        <button onClick={() => setCurrentScreen('menu')}>메뉴로 돌아가기</button>
+        <button onClick={() => { cancelCamera(); setCurrentScreen('recommendations'); }}>추천 메뉴 보기</button>
+        <button onClick={chooseTouchOrder}>터치로 주문하기</button>
       </div>
     </main>
   );
@@ -1450,7 +1645,7 @@ function App() {
     <main className="screen">
       <div className="screen-heading">
         <h2>KDS 주문 현황</h2>
-        <button className="primary" disabled={!cart.length || checkoutBusy} onClick={submitOrderToKds}>현재 장바구니 접수</button>
+        <button className="primary" disabled={!cart.length || checkoutBusy} onClick={submitOrderToKds}>현재 장바구니 결제</button>
       </div>
       {renderReceipt()}
       {paymentError && <p className="error" role="alert">{typeof paymentError === 'string' ? paymentError : paymentError.message}</p>}
@@ -1459,10 +1654,10 @@ function App() {
         <div className="action-row"><button disabled={kdsLoading || kdsUpdating !== null} onClick={() => loadKdsOrders()}>주문 새로고침</button><span>실시간 주문: {statusLabel[kdsStreamStatus] || kdsStreamStatus}</span></div>
         {kdsError && <p className="error" role="alert">{kdsError}</p>}
         {kdsLoading && <p role="status">주문을 불러오는 중입니다.</p>}
-        {!kdsLoading && !kdsOrders.length && <p className="empty">대기 주문이 없습니다.</p>}
+        {!kdsLoading && !kdsError && !kdsOrders.length && <p className="empty">대기 주문이 없습니다.</p>}
         <div className="kds-list">
           {kdsOrders.map((order) => <article key={order.id} className="kds-card">
-            <div><h3>{order.number}</h3><p>{order.menu}</p><small>{order.createdAt} / 수량 {order.qty}</small></div>
+            <div><h3>{order.number}</h3><p>{orderSummary(order, language)}</p><small>{new Date(order.orderedAt).toLocaleTimeString(localeFor(language), { hour: '2-digit', minute: '2-digit' })} / 수량 {order.qty}</small></div>
             <select aria-label={`${order.number} 조리 상태`} value={order.status} disabled={kdsUpdating !== null} onChange={(event) => updateKdsStatus(order.id, event.target.value)}>
               <option value="PAID" disabled>조리 대기</option><option value="PREPARING">조리 중</option><option value="COMPLETED">완료 대기</option>
             </select>
@@ -1497,7 +1692,7 @@ function App() {
           {adminLogs.map((log) => (
             <article key={log.id} className="audit-card">
               <strong>{log.event}</strong>
-              <p>{log.time} / {log.user}</p>
+              <p>{log.createdAt ? new Date(log.createdAt).toLocaleString(localeFor(language)) : log.time} / {log.user}</p>
               <small>{log.detail}</small>
             </article>
           ))}
@@ -1514,11 +1709,11 @@ function App() {
   aiMessageHandlerRef.current = handleAiMessage;
   speakRef.current = speak;
 
-  return (
-    <div className={`App ${highContrast ? 'high-contrast' : ''}`} onPointerDown={handleTouchSnapshot}>
+  return localizeTree(
+    <div lang={language} className={`App ${highContrast ? 'high-contrast' : ''}`}>
       {renderTopBar()}
       {renderSystemPanel()}
-      {loading && <div className="loading">처리 중...</div>}
+      {cameraProcessing && <div className="loading">처리 중...</div>}
       {aiResponsePending && (
         <div className="loading ai-pending" role="status" aria-live="polite">
           <span className="loading-spinner" aria-hidden="true" />
@@ -1532,8 +1727,7 @@ function App() {
       {currentScreen === 'ageResult' && renderAgeResult()}
       {currentScreen === 'kds' && renderKds()}
       {currentScreen === 'admin' && renderAdmin()}
-      <video ref={videoRef} className="hidden-video" muted playsInline />
-    </div>
+    </div>, language,
   );
 }
 

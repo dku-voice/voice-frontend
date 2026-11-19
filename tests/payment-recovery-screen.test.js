@@ -70,9 +70,9 @@ async function renderSavedScreen({ storage, details, screen = 'payment', serverM
         if (serverMenus) {
           const categories = groupMenus(normalizeMenus([{ menuId: 1, nameKo: '버거', price: 5900,
             status: 'ACTIVE', categoryNameKo: '버거', options: [] }]));
-          transformed = transformed.replace('useState(fallbackMenuCatalog)', `useState(${JSON.stringify(categories)})`)
-            .replace("useState('sample')", "useState('server')")
-            .replace('useState(fallbackMenuCatalog[0].id)', "useState('버거')");
+          transformed = transformed.replace('const [menuCatalog, setMenuCatalog] = useState([])', `const [menuCatalog, setMenuCatalog] = useState(${JSON.stringify(categories)})`)
+            .replace("useState('loading')", "useState('server')")
+            .replace("const [selectedCategory, setSelectedCategory] = useState('')", "const [selectedCategory, setSelectedCategory] = useState('버거')");
         }
         return transformed;
       } }],

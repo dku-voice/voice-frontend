@@ -28,7 +28,10 @@ test('기존 메뉴와 결제 영역을 유지하고 최종 결제 버튼 하나
         const html = renderToString(React.createElement(App));
         assert(html.includes('음성 인식 키오스크'));
         if (screen === 'menu') {
-          assert.equal((html.match(/class="item-card /g) || []).length, 7);
+          assert.equal((html.match(/class="item-card /g) || []).length, 0);
+          assert(html.includes('메뉴를 불러오는 중입니다.'));
+          assert(!html.includes('클래식 버거'));
+          assert(!html.includes('5,900원'));
           assert(html.includes('연령 추정'));
           assert(!html.includes('5초 지연 테스트'));
         } else {

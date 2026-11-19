@@ -389,6 +389,13 @@ button.active {
   width: 1px;
 }
 
+.camera-preview {
+  width: min(100%, 320px);
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
 @media (max-width: 820px) {
   .App {
     padding: 12px;
