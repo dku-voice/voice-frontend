@@ -1,0 +1,39 @@
+{
+  "checkedAt": "2026-11-13T14:27:37.447Z",
+  "origin": "https://dku-voice.com",
+  "mutationsPerformed": false,
+  "results": [
+    {
+      "method": "GET",
+      "path": "/api/menus",
+      "status": 500,
+      "contentType": "application/json",
+      "message": "서버 오류가 발생했습니다.",
+      "success": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/kds/orders?storeId=store-default",
+      "status": 500,
+      "contentType": "application/json",
+      "message": "서버 오류가 발생했습니다.",
+      "success": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/orders?storeId=store-default",
+      "status": 500,
+      "contentType": "application/json",
+      "message": "서버 오류가 발생했습니다.",
+      "success": null
+    },
+    {
+      "method": "GET",
+      "path": "/swagger-ui/index.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "message": null,
+      "success": null
+    }
+  ]
+}
