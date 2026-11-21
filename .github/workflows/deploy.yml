@@ -13,6 +13,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
             cd /home/ec2-user/voice
             git -C frontend pull origin main
             docker-compose build frontend

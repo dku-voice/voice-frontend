@@ -34,6 +34,16 @@ const resolveOptionIds = (menu, requested) => requested.map((requestedName) => {
 });
 
 const resolveMenu = (aiMenuId, menus) => {
+  if (/^\d+$/u.test(aiMenuId)) {
+    const menuId = Number(aiMenuId);
+    if (!Number.isSafeInteger(menuId) || menuId <= 0) {
+      throw new Error(`AI 메뉴 ID '${aiMenuId}'가 올바른 숫자 식별자가 아닙니다.`);
+    }
+    const menu = menus.find((candidate) => candidate.menuId === menuId);
+    if (!menu) throw new Error(`AI 메뉴 ID '${aiMenuId}'에 해당하는 메뉴를 현재 서버 메뉴에서 확인할 수 없습니다.`);
+    if (menu.status !== 'ACTIVE') throw new Error(`'${menu.nameKo || menu.name}' 메뉴는 현재 주문할 수 없습니다.`);
+    return menu;
+  }
   const expectedName = AI_MENU_NAMES[aiMenuId];
   if (!expectedName) throw new Error(`AI 메뉴 ID '${aiMenuId}'의 백엔드 메뉴 매핑이 필요합니다.`);
   const matches = menus.filter((menu) => normalizedText(menu.nameKo || menu.name) === normalizedText(expectedName));
