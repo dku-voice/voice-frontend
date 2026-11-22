@@ -530,7 +530,7 @@ function App() {
       setAiResponsePending(false);
       setResponseDelayTriggered(false);
       setNeedSnapshotTouch(false);
-      setMessage('음성 인식을 시작했습니다. 원하는 메뉴를 말씀해 주세요.');
+      setMessage('원하는 메뉴를 말씀해 주세요.');
     },
     onWaiting: () => {
       setMessage('음성 결과를 계속 기다리고 있습니다. 화면 터치로도 주문할 수 있습니다.');
@@ -667,7 +667,7 @@ function App() {
       voiceSessionRef.current = true;
       setIsRecording(true);
       setError('');
-      speak('음성 인식을 시작했습니다. 원하는 메뉴를 말씀해 주세요.');
+      speak('원하는 메뉴를 말씀해 주세요.');
     } catch (failure) {
       if (!current()) return;
       stopVoiceStreaming(false);
