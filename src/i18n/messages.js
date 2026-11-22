@@ -998,10 +998,10 @@ export const messages = {
     "es": "Conectado al servidor de IA. Ya puede pedir por voz.",
     "th": "เชื่อมต่อกับเซิร์ฟเวอร์ AI แล้ว เริ่มสั่งด้วยเสียงได้"
   },
-  "음성 인식을 시작했습니다. 원하는 메뉴를 말씀해 주세요.": {
-    "ja": "音声認識を開始しました。ご希望の商品をお話しください。",
-    "es": "Reconocimiento de voz iniciado. Diga qué desea pedir.",
-    "th": "เริ่มรับรู้เสียงแล้ว กรุณาพูดเมนูที่ต้องการ"
+  "원하는 메뉴를 말씀해 주세요.": {
+    "ja": "ご希望のメニューをお話しください。",
+    "es": "Diga qué desea pedir.",
+    "th": "กรุณาพูดเมนูที่ต้องการ"
   },
   "음성 인식을 종료했습니다.": {
     "ja": "音声認識を終了しました。",
