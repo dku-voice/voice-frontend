@@ -743,10 +743,10 @@ export const messages = {
     "es": "Aún no hay registros.",
     "th": "ยังไม่มีบันทึก"
   },
-  "서버 관리": {
-    "ja": "サーバー管理",
-    "es": "Administración del servidor",
-    "th": "จัดการเซิร์ฟเวอร์"
+  "매장 관리": {
+    "ja": "店舗管理",
+    "es": "Gestión de la tienda",
+    "th": "จัดการร้าน"
   },
   "로그인": {
     "ja": "ログイン",
