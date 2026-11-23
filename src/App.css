@@ -428,6 +428,120 @@ button.active {
   color: #ffe66d;
 }
 
+.welcome-screen,
+.complete-screen {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d8dee6;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.welcome-title,
+.complete-title {
+  font-size: 40px;
+  margin: 0;
+}
+
+.welcome-text {
+  color: #475569;
+  font-size: 22px;
+  margin: 0;
+}
+
+.start-order-button {
+  border-radius: 12px;
+  font-size: 32px;
+  min-height: 96px;
+  min-width: min(100%, 360px);
+}
+
+.welcome-camera {
+  aspect-ratio: 4 / 3;
+  background: #17202a;
+  object-fit: cover;
+}
+
+.welcome-status {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.senior-dialog {
+  border: 2px solid #0f766e;
+  border-radius: 12px;
+  max-width: 520px;
+  padding: 28px;
+}
+
+.senior-dialog h2 {
+  font-size: 30px;
+  margin: 0 0 12px;
+}
+
+.senior-dialog p {
+  font-size: 20px;
+}
+
+.senior-dialog .action-row {
+  justify-content: center;
+}
+
+.senior-dialog button {
+  font-size: 22px;
+  min-height: 64px;
+  min-width: 200px;
+}
+
+.complete-order-number {
+  font-size: 24px;
+  margin: 0;
+}
+
+.complete-order-number strong {
+  color: #0f766e;
+  display: block;
+  font-size: 56px;
+  letter-spacing: 2px;
+}
+
+.complete-items {
+  max-width: 480px;
+  text-align: left;
+  width: 100%;
+}
+
+.complete-items p {
+  margin: 6px 0;
+}
+
+.complete-screen > button {
+  font-size: 22px;
+  min-height: 64px;
+  min-width: 220px;
+}
+
+.high-contrast .welcome-screen,
+.high-contrast .complete-screen {
+  background: #000;
+  border-color: #fff;
+}
+
+.high-contrast .welcome-text {
+  color: #fff;
+}
+
+.high-contrast .complete-order-number strong {
+  color: #ffe66d;
+}
+
 @media (max-width: 820px) {
   .App {
     padding: 12px;
