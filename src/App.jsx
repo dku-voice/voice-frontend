@@ -562,7 +562,6 @@ function App() {
         return known || null;
       }).filter(Boolean) : [];
       setRecommendations(items);
-      if (!paymentBusyRef.current && !['payment', 'ageResult'].includes(currentScreenRef.current)) setCurrentScreen('recommendations');
     }
 
     if (data.type === 'kds_status' && data.order) {
@@ -1540,7 +1539,6 @@ function App() {
         {[
           ['menu', '메뉴'],
           ['cart', `장바구니 ${totalQuantity}`],
-          ['recommendations', '추천'],
           ['kds', 'KDS'],
           ['admin', '관리자'],
         ].map(([screen, label]) => (
@@ -1703,7 +1701,6 @@ function App() {
       {renderReceiptLookup()}
       <div className="action-row">
         <button onClick={() => setCurrentScreen('menu')}>메뉴로 돌아가기</button>
-        <button onClick={() => setCurrentScreen('recommendations')}>추천 확인</button>
         <button className="primary" disabled={!cart.length && !hasAuthenticatedPayment} onClick={() => setCurrentScreen('payment')}>
           {hasAuthenticatedPayment ? '결제 결과 확인' : '결제하기'}
         </button>
@@ -1799,7 +1796,7 @@ function App() {
       </div>
       <div className="action-row">
         <button onClick={() => setHighContrast(true)}>고대비 UI 켜기</button>
-        <button onClick={() => { cancelCamera(); setCurrentScreen('recommendations'); }}>추천 메뉴 보기</button>
+        <button onClick={() => { cancelCamera(); setCurrentScreen('menu'); }}>메뉴로 돌아가기</button>
         <button onClick={chooseTouchOrder}>터치로 주문하기</button>
       </div>
     </main>
