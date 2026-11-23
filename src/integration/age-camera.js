@@ -17,7 +17,8 @@ const cameraError = (code) => Object.assign(new Error(ageCameraMessages[code]), 
 const canceled = () => Object.assign(new Error('카메라 작업이 취소되었습니다.'), { name: 'AbortError' });
 
 // Camera resources and the single captured Blob stay local to this controller.
-// Only analyze(), a separate explicit action after preview, calls the injected API.
+// analyze() is the only operation that calls the injected API. Continuous kiosk
+// mode may retain the preview between analyses without retaining captured Blobs.
 export function createAgeCamera({
   getVideo = () => null,
   mediaDevices = () => globalThis.navigator?.mediaDevices,
@@ -28,6 +29,7 @@ export function createAgeCamera({
   timeoutMs = 30000,
   permissionTimeoutMs = 15000,
   captureTimeoutMs = 10000,
+  retainPreviewAfterAnalyze = false,
 } = {}) {
   let state = { phase: 'idle', error: null, result: null };
   let epoch = 0;
@@ -36,6 +38,8 @@ export function createAgeCamera({
   const stoppedTracks = new WeakSet();
   const snapshot = () => ({ ...state, error: state.error ? { ...state.error } : null, result: state.result ? { ...state.result } : null });
   const notify = (callback, value) => { try { callback(value); } catch { /* An observer cannot own camera resources. */ } };
+  const retainPreview = () => typeof retainPreviewAfterAnalyze === 'function'
+    ? Boolean(retainPreviewAfterAnalyze()) : Boolean(retainPreviewAfterAnalyze);
   const publish = (next) => { state = next; notify(onState, snapshot()); };
   const alive = (op) => operation === op && epoch === op.epoch && !op.controller.signal.aborted;
   const stopStream = (stream) => {
@@ -86,8 +90,14 @@ export function createAgeCamera({
   const fail = (op, error) => {
     if (!alive(op)) return;
     const details = errorDetails(error, op.kind);
+    const keepPreview = op.kind === 'analyze' && state.phase === 'analyzing' && retainPreview()
+      && preview === op.resources && !op.resources?.released;
     operation = null;
     op.controller.abort();
+    if (keepPreview) {
+      publish({ phase: 'preview', error: details, result: null });
+      return;
+    }
     release(op.resources);
     release(preview);
     publish({ phase: 'error', error: details, result: null });
@@ -178,7 +188,7 @@ export function createAgeCamera({
           canvas.width = 0;
           canvas.height = 0;
         }
-        release(op.resources);
+        if (!retainPreview()) release(op.resources);
       }
       if (!alive(op)) return null;
       if (typeof analyzeImage !== 'function') throw cameraError('ANALYSIS_FAILED');
@@ -196,7 +206,7 @@ export function createAgeCamera({
         || typeof received.ageGroup !== 'string' || typeof received.isSenior !== 'boolean') throw cameraError('INVALID_RESPONSE');
       const result = { estimatedAge: received.estimatedAge, ageGroup: received.ageGroup, isSenior: received.isSenior };
       operation = null;
-      publish({ phase: 'success', error: null, result });
+      publish({ phase: retainPreview() ? 'preview' : 'success', error: null, result });
       if (epoch !== op.epoch || op.controller.signal.aborted) return null;
       notify(onResult, { ...result });
       return { ...result };
