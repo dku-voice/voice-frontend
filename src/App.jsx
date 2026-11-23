@@ -1859,7 +1859,7 @@ function App() {
         </div>
       </section>
       <section className="server-admin">
-        <h2>서버 관리</h2>
+        <h2>매장 관리</h2>
         {renderLogin('admin')}
         {session?.role === 'ADMIN' && renderAdminServer()}
       </section>
