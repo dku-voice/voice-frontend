@@ -457,7 +457,7 @@ function App() {
       retryCountRef.current = 0;
       setWsStatus('open');
       setRetryCount(0);
-      speakRef.current?.('AI 서버와 연결되었습니다. 음성 주문을 시작할 수 있습니다.');
+      speakRef.current?.('음성 주문을 시작할 수 있습니다.');
       addAuditLog('WebSocket 연결', '음성 서버 연결');
     };
     websocket.onmessage = (event) => {

@@ -45,7 +45,7 @@ export function createVoiceLanguageGuard() {
 
 // Existing worker output: mono 16 kHz signed Int16 PCM. This local activity
 // estimate does not claim that server analysis has started and changes no bytes.
-export const SPEECH_PAUSE_MS = 800;
+export const SPEECH_PAUSE_MS = 1600;
 export function hasVoiceActivity(pcm) {
   const samples = pcm instanceof Int16Array ? pcm
     : pcm instanceof ArrayBuffer && pcm.byteLength % 2 === 0 ? new Int16Array(pcm) : null;
