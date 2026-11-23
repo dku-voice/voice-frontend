@@ -22,6 +22,7 @@ import { createVoiceWait, receiveVoiceMessage, createVoiceLanguageGuard, waitFor
 import { isVoiceOrderResponse, normalizeVoiceOrderResponse } from './integration/voice-order.js';
 import { ageAnalysisApi } from './api/vision.js';
 import { createAgeCamera } from './integration/age-camera.js';
+import { createAutoAgeMonitor } from './integration/auto-age-monitor.js';
 import { rankTtsVoices, selectTtsVoice, ttsSettings, waitForTtsVoice } from './integration/tts.js';
 
 const AI_WS_URL = runtimeConfig.aiWsUrl;
@@ -117,6 +118,8 @@ function App() {
   const voiceStartingRef = useRef(false);
   const voiceGenerationRef = useRef(0);
   const videoRef = useRef(null);
+  const cameraModeRef = useRef('idle');
+  const autoAgeMonitorRef = useRef(null);
   const paymentWidgetRef = useRef(null);
   const paymentPreparationRef = useRef(null);
   const paymentFingerprintRef = useRef(null);
@@ -171,8 +174,11 @@ function App() {
   const menuSourceRef = useRef(menuSource);
   menuSourceRef.current = menuSource;
   const cameraRef = useRef(null);
-  const cameraContextActive = () => appMountedRef.current && currentScreenRef.current === 'ageResult'
-    && !voiceStartingRef.current && !voiceSessionRef.current && !voiceWaitRef.current?.active && !paymentBusyRef.current;
+  const cameraContextActive = () => {
+    const expectedScreen = cameraModeRef.current === 'auto' ? 'menu' : 'ageResult';
+    return appMountedRef.current && currentScreenRef.current === expectedScreen
+      && !voiceStartingRef.current && !voiceSessionRef.current && !voiceWaitRef.current?.active && !paymentBusyRef.current;
+  };
   if (!cameraRef.current) cameraRef.current = createAgeCamera({
     getVideo: () => videoRef.current,
     analyze: (blob, options) => {
@@ -181,24 +187,44 @@ function App() {
     },
     onState: (next) => {
       if (!cameraContextActive()) return;
-      setCameraState(next);
-      if (next.phase !== 'success') {
+      const automatic = cameraModeRef.current === 'auto';
+      const waitingForPerson = automatic && next.phase === 'preview' && next.error?.code === 'ANALYSIS_FAILED';
+      setCameraState(waitingForPerson ? { ...next, error: null } : next);
+      if ((!automatic && next.phase !== 'success') || next.phase === 'error' || waitingForPerson) {
         setAgeEstimate(null);
         setAgeSource('camera');
       }
       const labels = { idle: '대기 중', opening: '카메라 준비 중', preview: '카메라 켜짐', capturing: '사진 준비 중',
         analyzing: '나이 분석 중', success: '분석 완료', error: '분석 실패' };
-      setSnapshotStatus(labels[next.phase] || '대기 중');
+      setSnapshotStatus(waitingForPerson ? '대기 중' : labels[next.phase] || '대기 중');
     },
     onResult: (result) => {
       if (!cameraContextActive()) return;
       // No team policy is confirmed: isSenior/ageGroup must not select a mode.
       setAgeSource('camera');
       setAgeEstimate(result.estimatedAge);
-      speakRef.current?.('나이 분석이 완료되었습니다.');
+      setSnapshotStatus('분석 완료');
+      if (cameraModeRef.current !== 'auto') speakRef.current?.('나이 분석이 완료되었습니다.');
     },
+    retainPreviewAfterAnalyze: () => cameraModeRef.current === 'auto',
   });
-  const cameraProcessing = ['opening', 'capturing', 'analyzing'].includes(cameraState.phase);
+  if (!autoAgeMonitorRef.current) autoAgeMonitorRef.current = createAutoAgeMonitor({
+    openCamera: () => cameraRef.current.open(),
+    analyzeCamera: () => cameraRef.current.analyze(),
+    cancelCamera: () => {
+      cameraRef.current.cancel();
+      if (cameraModeRef.current === 'auto') cameraModeRef.current = 'idle';
+      if (appMountedRef.current) {
+        setCameraState({ phase: 'idle', error: null, result: null });
+        setSnapshotStatus('대기 중');
+      }
+    },
+    getCameraState: () => cameraRef.current.getState(),
+    canRun: () => cameraModeRef.current === 'auto' && cameraContextActive()
+      && globalThis.document?.visibilityState !== 'hidden',
+  });
+  const cameraProcessing = cameraModeRef.current !== 'auto'
+    && ['opening', 'capturing', 'analyzing'].includes(cameraState.phase);
 
   const totalPrice = useMemo(
     () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -812,6 +838,8 @@ function App() {
     availableRecommendations(menuItemsRef.current, menuItemsRef.current, cartItems).slice(0, 3);
 
   const cancelCamera = () => {
+    autoAgeMonitorRef.current?.stop();
+    cameraModeRef.current = 'idle';
     cameraRef.current.cancel();
     if (!appMountedRef.current) return;
     setCameraState({ phase: 'idle', error: null, result: null });
@@ -829,9 +857,13 @@ function App() {
       return;
     }
     cancelCamera();
+    cameraModeRef.current = 'manual';
     setCurrentScreen('ageResult');
   };
-  const openCamera = () => { if (cameraContextActive()) cameraRef.current.open(); };
+  const openCamera = () => {
+    cameraModeRef.current = 'manual';
+    if (cameraContextActive()) cameraRef.current.open();
+  };
   const analyzeCamera = () => { if (cameraContextActive()) cameraRef.current.analyze(); };
   const chooseTouchOrder = () => {
     cancelCamera();
@@ -856,6 +888,29 @@ function App() {
   useEffect(() => {
     if (isRecording || checkoutBusy || isPaymentWidgetLoading) cancelCamera();
   }, [isRecording, checkoutBusy, isPaymentWidgetLoading]);
+  useEffect(() => {
+    const monitor = autoAgeMonitorRef.current;
+    const allowed = currentScreen === 'menu' && !isRecording && !voiceFinalizing && !aiResponsePending
+      && !checkoutBusy && !isPaymentWidgetLoading;
+    const start = () => {
+      if (!allowed || globalThis.document?.visibilityState === 'hidden') return;
+      cameraModeRef.current = 'auto';
+      monitor.start();
+    };
+    const visibility = () => {
+      if (globalThis.document?.visibilityState === 'hidden') monitor.stop();
+      else start();
+    };
+    const leave = () => monitor.stop();
+    if (allowed) start(); else monitor.stop();
+    globalThis.document?.addEventListener?.('visibilitychange', visibility);
+    globalThis.window?.addEventListener?.('pagehide', leave);
+    return () => {
+      globalThis.document?.removeEventListener?.('visibilitychange', visibility);
+      globalThis.window?.removeEventListener?.('pagehide', leave);
+      monitor.stop();
+    };
+  }, [currentScreen, isRecording, voiceFinalizing, aiResponsePending, checkoutBusy, isPaymentWidgetLoading]);
 
   const submitOrderToKds = () => { if (cart.length && !paymentBusyRef.current) setCurrentScreen('payment'); };
 
@@ -1432,7 +1487,12 @@ function App() {
             key={screen}
             disabled={checkoutBusy}
             className={currentScreen === screen ? 'active' : ''}
-            onClick={() => { if (!paymentBusyRef.current) { cancelCamera(); setCurrentScreen(screen); } }}
+            onClick={() => {
+              if (!paymentBusyRef.current && screen !== currentScreenRef.current) {
+                cancelCamera();
+                setCurrentScreen(screen);
+              }
+            }}
           >
             {label}
           </button>
@@ -1471,6 +1531,14 @@ function App() {
           : '서버 메뉴를 다시 불러온 뒤 주문할 수 있습니다.'}</p>}
         <button type="button" disabled={menuLoading || checkoutBusy} onClick={loadMenus}>메뉴 다시 불러오기</button>
         {needSnapshotTouch && <p className="hint">화면 터치로 주문할 수 있습니다. 카메라 분석은 별도로 선택할 수 있습니다.</p>}
+        <div className="auto-age-card">
+          <h3>카메라 나이 분석</h3>
+          <video ref={videoRef} className="camera-preview auto-age-preview" muted playsInline aria-label="카메라 미리보기" />
+          <p className="auto-age-value">{Number.isFinite(ageEstimate) ? `${ageEstimate}세` : '결과 대기'}</p>
+          <p role="status" aria-live="polite">카메라: {snapshotStatus}</p>
+          {cameraState.error && <p className="error" role="alert">{cameraState.error.message}</p>}
+          <p className="hint">카메라 분석 결과는 추정값이며 실제 나이와 다를 수 있습니다.</p>
+        </div>
         <div className="action-row">
           <button className="primary" disabled={voiceFinalizing} onClick={isRecording ? finishVoiceStreaming : startVoiceStreaming}>
             {voiceFinalizing ? '음성 처리 중…' : isRecording ? '음성 중지' : '음성 시작'}
