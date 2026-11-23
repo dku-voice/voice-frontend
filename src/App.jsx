@@ -100,6 +100,7 @@ function App() {
   const [needSnapshotTouch, setNeedSnapshotTouch] = useState(false);
   const [ageEstimate, setAgeEstimate] = useState(null);
   const [highContrast, setHighContrast] = useState(false);
+  const [seniorDemo, setSeniorDemo] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [snapshotStatus, setSnapshotStatus] = useState('대기 중');
   const [paymentStatus, setPaymentStatus] = useState('결제 수단을 준비하고 있습니다.');
@@ -914,7 +915,8 @@ function App() {
       setAgeEstimate(result.estimatedAge);
       addAuditLog('주문 시작 나이 분석', `${result.estimatedAge}세`);
     }
-    if (result?.isSenior) {
+    if (seniorDemo || result?.isSenior) {
+      if (seniorDemo) addAuditLog('시연 모드', '60세 이상 안내 표시');
       setStartPhase('senior');
       speak('화면 터치로 주문하시겠어요?');
       return;
@@ -1827,6 +1829,10 @@ function App() {
         <label className="toggle-row">
           <input type="checkbox" checked={highContrast} onChange={(event) => setHighContrast(event.target.checked)} />
           고대비 UI
+        </label>
+        <label className="toggle-row">
+          <input type="checkbox" checked={seniorDemo} onChange={(event) => setSeniorDemo(event.target.checked)} />
+          시연 모드: 주문 시작 시 60세 이상 안내 표시
         </label>
         <label className="toggle-row">
           <input type="checkbox" checked={ttsEnabled} onChange={(event) => setTtsEnabled(event.target.checked)} />

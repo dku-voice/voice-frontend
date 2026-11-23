@@ -993,6 +993,11 @@ export const messages = {
     "es": "Compruebe la conexión",
     "th": "ต้องตรวจสอบการเชื่อมต่อ"
   },
+  "시연 모드: 주문 시작 시 60세 이상 안내 표시": {
+    "ja": "デモモード：注文開始時に60歳以上向け案内を表示",
+    "es": "Modo demostración: mostrar aviso para mayores de 60 al iniciar",
+    "th": "โหมดสาธิต: แสดงคำแนะนำสำหรับผู้มีอายุ 60 ปีขึ้นไปเมื่อเริ่มสั่ง"
+  },
   "음성 주문을 시작할 수 있습니다.": {
     "ja": "音声注文を開始できます。",
     "es": "Ya puede pedir por voz.",
