@@ -38,6 +38,7 @@ test('기존 메뉴와 결제 영역을 유지하고 최종 결제 버튼 하나
           assert(html.includes('주문 시작 시 한 번 촬영해 분석합니다.'));
           assert(html.includes('카메라 분석 결과는 추정값이며 실제 나이와 다를 수 있습니다.'));
           assert(!html.includes('5초 지연 테스트'));
+          assert(!html.includes('>추천</button>'));
         } else {
           assert(html.includes('장바구니로 돌아가기'));
           assert.equal((html.match(/>결제하기<\/button>/g) || []).length, 1);
