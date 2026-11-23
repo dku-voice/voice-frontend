@@ -61,6 +61,36 @@ test('미리보기와 전송을 분리하고 촬영 직후 카메라·캔버스�
   assert.deepEqual(camera.getState(), { phase: 'idle', error: null, result: null });
 });
 
+test('자동 모드는 캡처 Blob만 폐기하고 카메라 미리보기를 유지해 반복 분석한다', async () => {
+  let analyses = 0;
+  const state = setup({
+    retainPreviewAfterAnalyze: true,
+    analyze: async (blob) => {
+      assert(blob instanceof Blob); analyses += 1;
+      assert.equal(state.video.srcObject, state.streams[0]);
+      assert.equal(state.streams[0].track.stops, 0);
+      return age(41 + analyses);
+    },
+  });
+  await state.camera.open();
+  assert.deepEqual(await state.camera.analyze(), age(42));
+  assert.equal(state.camera.getState().phase, 'preview');
+  assert.deepEqual(await state.camera.analyze(), age(43));
+  assert.equal(state.streams.length, 1); assert.equal(state.streams[0].track.stops, 0);
+  assert.equal(state.video.srcObject, state.streams[0]);
+  state.camera.cancel(); assert.equal(state.streams[0].track.stops, 1); assert.equal(state.video.srcObject, null);
+});
+
+test('자동 분석 서버 오류는 미리보기를 유지하고 다음 분석을 허용한다', async () => {
+  const state = setup({ retainPreviewAfterAnalyze: true, analyze: async () => { throw new Error('temporary'); } });
+  await state.camera.open(); assert.equal(await state.camera.analyze(), null);
+  assert.equal(state.camera.getState().phase, 'preview');
+  assert.equal(state.camera.getState().error.code, 'ANALYSIS_FAILED');
+  assert.equal(state.streams[0].track.stops, 0); assert.equal(state.video.srcObject, state.streams[0]);
+  assert.equal(await state.camera.analyze(), null);
+  state.camera.cancel(); assert.equal(state.streams[0].track.stops, 1);
+});
+
 test('중복 열기·분석은 같은 Promise를 재사용하며 미리보기에서 다시 열어도 재권한 요청하지 않는다', async () => {
   const capture = deferred(); const state = setup({ analyze: () => capture.promise });
   const first = state.camera.open(); assert.equal(first, state.camera.open());
