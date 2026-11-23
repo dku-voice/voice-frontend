@@ -1591,19 +1591,11 @@ function App() {
           ? '표시된 메뉴는 마지막으로 불러온 정보입니다. 서버 메뉴를 다시 불러온 뒤 주문할 수 있습니다.'
           : '서버 메뉴를 다시 불러온 뒤 주문할 수 있습니다.'}</p>}
         <button type="button" disabled={menuLoading || checkoutBusy} onClick={loadMenus}>메뉴 다시 불러오기</button>
-        {needSnapshotTouch && <p className="hint">화면 터치로 주문할 수 있습니다. 카메라 분석은 별도로 선택할 수 있습니다.</p>}
-        <div className="auto-age-card">
-          <h3>카메라 나이 분석</h3>
-          <p className="auto-age-value">{Number.isFinite(ageEstimate) ? `${ageEstimate}세` : '결과 없음'}</p>
-          <p className="hint">주문 시작 시 한 번 촬영해 분석합니다.</p>
-          <p className="hint">카메라 분석 결과는 추정값이며 실제 나이와 다를 수 있습니다.</p>
-        </div>
+        {needSnapshotTouch && <p className="hint">화면 터치로 주문할 수 있습니다.</p>}
         <div className="action-row">
           <button className="primary" disabled={voiceFinalizing} onClick={isRecording ? finishVoiceStreaming : startVoiceStreaming}>
             {voiceFinalizing ? '음성 처리 중…' : isRecording ? '음성 중지' : '음성 시작'}
           </button>
-          <button disabled={checkoutBusy || isRecording} onClick={openAgeAnalysis}>카메라 나이 분석</button>
-          <button disabled={checkoutBusy || isRecording} onClick={openAgeAnalysis}>연령 추정</button>
         </div>
       </section>
 
@@ -1846,6 +1838,7 @@ function App() {
         <div className="action-row">
           <button onClick={() => { retryCountRef.current = 0; setRetryCount(0); connectWebSocket(); }}>WebSocket 재연결</button>
           <button onClick={() => addAuditLog('관리자 점검', '수동 점검 로그 추가', 'admin')}>감사 로그 추가</button>
+          <button disabled={checkoutBusy || isRecording} onClick={openAgeAnalysis}>카메라 나이 분석 테스트</button>
         </div>
       </section>
       <section>

@@ -2172,5 +2172,15 @@ export const messages = {
     "ja": "注文開始時の年齢分析",
     "es": "Análisis de edad al empezar",
     "th": "วิเคราะห์อายุเมื่อเริ่มสั่ง"
+  },
+  "화면 터치로 주문할 수 있습니다.": {
+    "ja": "画面タッチで注文できます。",
+    "es": "Puede pedir tocando la pantalla.",
+    "th": "สั่งได้โดยแตะหน้าจอ"
+  },
+  "카메라 나이 분석 테스트": {
+    "ja": "カメラ年齢分析テスト",
+    "es": "Prueba de análisis de edad con cámara",
+    "th": "ทดสอบการวิเคราะห์อายุด้วยกล้อง"
   }
 };
