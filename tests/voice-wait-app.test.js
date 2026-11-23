@@ -76,8 +76,8 @@ test('App은 9초 외국어 주문을 처리하고 12초 종료 후 늦은 응�
     const receive = (socket, data) => socket.onmessage({ data: JSON.stringify(data) });
     const silence = () => app.sendAudioToServer(new Int16Array(4096).buffer);
     app.selectLanguageManually('ko'); await app.startVoiceStreaming(); const first = sockets[0];
-    await app.sendAudioToServer(new Int16Array(4096).fill(3000).buffer); clock.tick(800);
-    assert.equal(first.sent.at(-1), 'END', '800ms speech pause must finish the server recording');
+    await app.sendAudioToServer(new Int16Array(4096).fill(3000).buffer); clock.tick(1600);
+    assert.equal(first.sent.at(-1), 'END', '1600ms speech pause must finish the server recording');
     clock.tick(5000); assert.equal(first.readyState, 1); assert.equal(app.voiceSessionRef.current, true);
     clock.tick(4000); receive(first, { type: 'order', item, language: 'ja' });
     assert.equal(trace.cart[0].quantity, 1); assert.equal(app.languageRef.current, 'ja'); assert.equal(clock.count, 0);
