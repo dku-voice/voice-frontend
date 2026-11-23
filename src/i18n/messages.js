@@ -2097,5 +2097,80 @@ export const messages = {
     "ja": "チリソース",
     "es": "Salsa de chile",
     "th": "ซอสพริก"
+  },
+  "어서 오세요": {
+    "ja": "いらっしゃいませ",
+    "es": "Bienvenido",
+    "th": "ยินดีต้อนรับ"
+  },
+  "음성이나 화면 터치로 주문할 수 있어요.": {
+    "ja": "音声または画面タッチで注文できます。",
+    "es": "Puede pedir por voz o tocando la pantalla.",
+    "th": "สั่งได้ด้วยเสียงหรือแตะหน้าจอ"
+  },
+  "주문 시작": {
+    "ja": "注文を始める",
+    "es": "Empezar pedido",
+    "th": "เริ่มสั่งอาหาร"
+  },
+  "잠시 화면을 바라봐 주세요.": {
+    "ja": "少しの間、画面をご覧ください。",
+    "es": "Mire la pantalla un momento, por favor.",
+    "th": "กรุณามองที่หน้าจอสักครู่"
+  },
+  "화면 터치로 주문하시겠어요?": {
+    "ja": "画面タッチで注文しますか？",
+    "es": "¿Desea pedir tocando la pantalla?",
+    "th": "ต้องการสั่งโดยแตะหน้าจอไหม"
+  },
+  "화면의 메뉴를 눌러서 편하게 주문할 수 있어요.": {
+    "ja": "画面のメニューを押して簡単に注文できます。",
+    "es": "Puede pedir fácilmente tocando el menú en la pantalla.",
+    "th": "แตะเมนูบนหน้าจอเพื่อสั่งได้อย่างสะดวก"
+  },
+  "음성으로 계속하기": {
+    "ja": "音声で続ける",
+    "es": "Seguir por voz",
+    "th": "สั่งด้วยเสียงต่อ"
+  },
+  "메뉴를 눌러 장바구니에 담아 주세요.": {
+    "ja": "メニューを押してカートに入れてください。",
+    "es": "Toque un producto para añadirlo al carrito.",
+    "th": "แตะเมนูเพื่อใส่ลงตะกร้า"
+  },
+  "음성 시작 버튼을 누르고 원하는 메뉴를 말씀해 주세요.": {
+    "ja": "音声開始ボタンを押して、ご希望のメニューをお話しください。",
+    "es": "Pulse el botón de voz y diga lo que desea pedir.",
+    "th": "กดปุ่มเริ่มเสียงแล้วพูดเมนูที่ต้องการ"
+  },
+  "주문이 완료되었습니다.": {
+    "ja": "注文が完了しました。",
+    "es": "Su pedido se ha completado.",
+    "th": "สั่งอาหารเรียบร้อยแล้ว"
+  },
+  "{seconds}초 후 처음 화면으로 돌아갑니다.": {
+    "ja": "{seconds}秒後に最初の画面に戻ります。",
+    "es": "Volverá a la pantalla inicial en {seconds} segundos.",
+    "th": "จะกลับไปหน้าแรกใน {seconds} วินาที"
+  },
+  "처음으로": {
+    "ja": "最初の画面へ",
+    "es": "Volver al inicio",
+    "th": "กลับหน้าแรก"
+  },
+  "결과 없음": {
+    "ja": "結果なし",
+    "es": "Sin resultado",
+    "th": "ไม่มีผลลัพธ์"
+  },
+  "주문 시작 시 한 번 촬영해 분석합니다.": {
+    "ja": "注文開始時に一度だけ撮影して分析します。",
+    "es": "Se toma y analiza una sola foto al empezar el pedido.",
+    "th": "ถ่ายภาพและวิเคราะห์หนึ่งครั้งเมื่อเริ่มสั่ง"
+  },
+  "주문 시작 나이 분석": {
+    "ja": "注文開始時の年齢分析",
+    "es": "Análisis de edad al empezar",
+    "th": "วิเคราะห์อายุเมื่อเริ่มสั่ง"
   }
 };

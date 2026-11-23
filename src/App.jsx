@@ -47,6 +47,18 @@ const toKdsCard = (order) => {
   };
 };
 
+const COMPLETE_RETURN_SECONDS = 30;
+const START_CAMERA_OPEN_MS = 5000;
+const START_CAMERA_ANALYZE_MS = 8000;
+const initialKioskStage = () => {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return 'ordering';
+  return window.location?.pathname?.startsWith('/payment/') ? 'ordering' : 'welcome';
+};
+const resolveWithin = (promise, ms) => Promise.race([
+  Promise.resolve(promise).catch(() => null),
+  new Promise((resolve) => { setTimeout(() => resolve(null), ms); }),
+]);
+
 function App() {
   const [language, setLanguage] = useState(readLanguage);
   const languageRef = useRef(language);
@@ -71,6 +83,12 @@ function App() {
   const [wsStatus, setWsStatus] = useState('closed');
   const [retryCount, setRetryCount] = useState(0);
   const [message, setMessage] = useState('환영합니다. 음성 또는 화면 터치로 주문을 시작하세요.');
+  const [kioskStage, setKioskStage] = useState(initialKioskStage);
+  const kioskStageRef = useRef(kioskStage);
+  kioskStageRef.current = kioskStage;
+  const [startPhase, setStartPhase] = useState('idle');
+  const startingOrderRef = useRef(false);
+  const [completeCountdown, setCompleteCountdown] = useState(0);
   const [error, setError] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [voiceFinalizing, setVoiceFinalizing] = useState(false);
@@ -175,8 +193,11 @@ function App() {
   menuSourceRef.current = menuSource;
   const cameraRef = useRef(null);
   const cameraContextActive = () => {
-    const expectedScreen = cameraModeRef.current === 'auto' ? 'menu' : 'ageResult';
-    return appMountedRef.current && currentScreenRef.current === expectedScreen
+    const mode = cameraModeRef.current;
+    const screenReady = mode === 'start'
+      ? currentScreenRef.current === 'menu' && kioskStageRef.current === 'welcome'
+      : currentScreenRef.current === (mode === 'auto' ? 'menu' : 'ageResult');
+    return appMountedRef.current && screenReady
       && !voiceStartingRef.current && !voiceSessionRef.current && !voiceWaitRef.current?.active && !paymentBusyRef.current;
   };
   if (!cameraRef.current) cameraRef.current = createAgeCamera({
@@ -204,7 +225,7 @@ function App() {
       setAgeSource('camera');
       setAgeEstimate(result.estimatedAge);
       setSnapshotStatus('분석 완료');
-      if (cameraModeRef.current !== 'auto') speakRef.current?.('나이 분석이 완료되었습니다.');
+      if (cameraModeRef.current === 'manual') speakRef.current?.('나이 분석이 완료되었습니다.');
     },
     retainPreviewAfterAnalyze: () => cameraModeRef.current === 'auto',
   });
@@ -865,6 +886,58 @@ function App() {
     if (cameraContextActive()) cameraRef.current.open();
   };
   const analyzeCamera = () => { if (cameraContextActive()) cameraRef.current.analyze(); };
+  const enterOrdering = (mode) => {
+    setStartPhase('idle');
+    setKioskStage('ordering');
+    setCurrentScreen('menu');
+    speak(mode === 'touch' ? '메뉴를 눌러 장바구니에 담아 주세요.' : '음성 시작 버튼을 누르고 원하는 메뉴를 말씀해 주세요.');
+  };
+  const startOrder = async () => {
+    if (startingOrderRef.current || kioskStageRef.current !== 'welcome' || paymentBusyRef.current) return;
+    startingOrderRef.current = true;
+    setStartPhase('analyzing');
+    setMessage('잠시 화면을 바라봐 주세요.');
+    cameraModeRef.current = 'start';
+    let result = null;
+    try {
+      const opened = await resolveWithin(cameraRef.current.open(), START_CAMERA_OPEN_MS);
+      if (opened && cameraContextActive()) result = await resolveWithin(cameraRef.current.analyze(), START_CAMERA_ANALYZE_MS);
+    } finally {
+      cameraRef.current.cancel();
+      cameraModeRef.current = 'idle';
+      startingOrderRef.current = false;
+    }
+    if (!appMountedRef.current || kioskStageRef.current !== 'welcome') return;
+    setSnapshotStatus(result ? '분석 완료' : '대기 중');
+    setCameraState({ phase: 'idle', error: null, result: null });
+    if (result) {
+      setAgeSource('camera');
+      setAgeEstimate(result.estimatedAge);
+      addAuditLog('주문 시작 나이 분석', `${result.estimatedAge}세`);
+    }
+    if (result?.isSenior) {
+      setStartPhase('senior');
+      speak('화면 터치로 주문하시겠어요?');
+      return;
+    }
+    enterOrdering('voice');
+  };
+  const returnToWelcome = () => {
+    if (paymentBusyRef.current) return;
+    if (voiceStartingRef.current || voiceSessionRef.current || voiceWaitRef.current.active) {
+      stopVoiceStreaming(false);
+      retireVoiceSocket(wsRef.current);
+    }
+    cancelCamera();
+    setCompleteCountdown(0);
+    setStartPhase('idle');
+    setError('');
+    setReceipt(null);
+    changeLanguage('ko');
+    setMessage('환영합니다. 음성 또는 화면 터치로 주문을 시작하세요.');
+    setKioskStage('welcome');
+    setCurrentScreen('menu');
+  };
   const chooseTouchOrder = () => {
     cancelCamera();
     if (voiceStartingRef.current || voiceSessionRef.current || voiceWaitRef.current.active) {
@@ -889,28 +962,14 @@ function App() {
     if (isRecording || checkoutBusy || isPaymentWidgetLoading) cancelCamera();
   }, [isRecording, checkoutBusy, isPaymentWidgetLoading]);
   useEffect(() => {
-    const monitor = autoAgeMonitorRef.current;
-    const allowed = currentScreen === 'menu' && !isRecording && !voiceFinalizing && !aiResponsePending
-      && !checkoutBusy && !isPaymentWidgetLoading;
-    const start = () => {
-      if (!allowed || globalThis.document?.visibilityState === 'hidden') return;
-      cameraModeRef.current = 'auto';
-      monitor.start();
-    };
-    const visibility = () => {
-      if (globalThis.document?.visibilityState === 'hidden') monitor.stop();
-      else start();
-    };
-    const leave = () => monitor.stop();
-    if (allowed) start(); else monitor.stop();
-    globalThis.document?.addEventListener?.('visibilitychange', visibility);
-    globalThis.window?.addEventListener?.('pagehide', leave);
-    return () => {
-      globalThis.document?.removeEventListener?.('visibilitychange', visibility);
-      globalThis.window?.removeEventListener?.('pagehide', leave);
-      monitor.stop();
-    };
-  }, [currentScreen, isRecording, voiceFinalizing, aiResponsePending, checkoutBusy, isPaymentWidgetLoading]);
+    if (currentScreen !== 'complete') return undefined;
+    if (completeCountdown <= 0) {
+      returnToWelcome();
+      return undefined;
+    }
+    const timer = setTimeout(() => setCompleteCountdown((value) => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [currentScreen, completeCountdown]);
 
   const submitOrderToKds = () => { if (cart.length && !paymentBusyRef.current) setCurrentScreen('payment'); };
 
@@ -944,7 +1003,9 @@ function App() {
       setCart((prev) => removePaidItemsFromCart(prev, order.items));
     }
     setPaymentStatus('결제가 완료되었습니다.');
-    setCurrentScreen('kds');
+    setKioskStage('ordering');
+    setCompleteCountdown(COMPLETE_RETURN_SECONDS);
+    setCurrentScreen('complete');
     addAuditLog('결제 완료', order.orderNumber);
     speak('결제가 완료되었습니다. 주문이 접수되었습니다.');
   };
@@ -1533,10 +1594,8 @@ function App() {
         {needSnapshotTouch && <p className="hint">화면 터치로 주문할 수 있습니다. 카메라 분석은 별도로 선택할 수 있습니다.</p>}
         <div className="auto-age-card">
           <h3>카메라 나이 분석</h3>
-          <video ref={videoRef} className="camera-preview auto-age-preview" muted playsInline aria-label="카메라 미리보기" />
-          <p className="auto-age-value">{Number.isFinite(ageEstimate) ? `${ageEstimate}세` : '결과 대기'}</p>
-          <p role="status" aria-live="polite">카메라: {snapshotStatus}</p>
-          {cameraState.error && <p className="error" role="alert">{cameraState.error.message}</p>}
+          <p className="auto-age-value">{Number.isFinite(ageEstimate) ? `${ageEstimate}세` : '결과 없음'}</p>
+          <p className="hint">주문 시작 시 한 번 촬영해 분석합니다.</p>
           <p className="hint">카메라 분석 결과는 추정값이며 실제 나이와 다를 수 있습니다.</p>
         </div>
         <div className="action-row">
@@ -1573,6 +1632,43 @@ function App() {
           ))}
         </div>
       </section>
+    </main>
+  );
+
+  const renderWelcome = () => (
+    <main className="screen welcome-screen">
+      <video ref={videoRef} className="camera-preview welcome-camera" hidden={startPhase !== 'analyzing'} muted playsInline aria-label="카메라 미리보기" />
+      {startPhase === 'analyzing' && <p className="welcome-status" role="status" aria-live="polite">잠시 화면을 바라봐 주세요.</p>}
+      {startPhase === 'idle' && <>
+        <h2 className="welcome-title">어서 오세요</h2>
+        <p className="welcome-text">음성이나 화면 터치로 주문할 수 있어요.</p>
+        <button className="primary start-order-button" disabled={checkoutBusy} onClick={startOrder}>주문 시작</button>
+      </>}
+      {startPhase === 'senior' && <section className="senior-dialog" role="dialog" aria-modal="true" aria-labelledby="senior-dialog-title">
+        <h2 id="senior-dialog-title">화면 터치로 주문하시겠어요?</h2>
+        <p>화면의 메뉴를 눌러서 편하게 주문할 수 있어요.</p>
+        <div className="action-row">
+          <button className="primary" onClick={() => enterOrdering('touch')}>터치로 주문하기</button>
+          <button onClick={() => enterOrdering('voice')}>음성으로 계속하기</button>
+        </div>
+      </section>}
+    </main>
+  );
+
+  const renderComplete = () => (
+    <main className="screen complete-screen">
+      <h2 className="complete-title">주문이 완료되었습니다.</h2>
+      {receipt && <>
+        <p className="complete-order-number">주문번호 <strong>{receipt.orderNumber}</strong></p>
+        <section className="complete-items">
+          {(receipt.items || []).map((item, index) => <p key={item.lineId || `${item.menuId}-${index}`}>
+            {item.menuNameKo} {item.quantity}개 · {formatPrice(item.subtotal ?? item.unitPrice * item.quantity)}
+          </p>)}
+          <strong>총액 {formatPrice(receipt.totalPrice)}</strong>
+        </section>
+      </>}
+      <p className="hint" role="status" aria-live="polite">{`${completeCountdown}초 후 처음 화면으로 돌아갑니다.`}</p>
+      <button className="primary" onClick={returnToWelcome}>처음으로</button>
     </main>
   );
 
@@ -1788,7 +1884,8 @@ function App() {
           AI가 주문을 인식하고 있어요…
         </div>
       )}
-      {currentScreen === 'menu' && renderMenu()}
+      {currentScreen === 'menu' && (kioskStage === 'welcome' ? renderWelcome() : renderMenu())}
+      {currentScreen === 'complete' && renderComplete()}
       {currentScreen === 'cart' && renderCart()}
       {currentScreen === 'recommendations' && renderRecommendations()}
       {currentScreen === 'payment' && renderPayment()}
