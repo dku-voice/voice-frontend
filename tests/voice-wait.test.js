@@ -4,7 +4,8 @@ import { createVoiceWait, hasVoiceActivity, SPEECH_PAUSE_MS, waitForVoiceSocket,
 
 import { fakeClock } from './helpers/voice-clock.js';
 
-const loud = () => new Int16Array(4096).fill(3000).buffer;
+const loud = () => new Int16Array(8192).fill(3000).buffer;
+const blip = () => new Int16Array(2048).fill(3000).buffer;
 const silence = () => new Int16Array(4096).buffer;
 const setup = () => {
   const clock = fakeClock(); const events = [];
@@ -38,6 +39,13 @@ test('실제 발화가 끝나면 END 콜백을 한 번만 실행하고 초기 �
   wait.finish(); wait.audio(loud(), 'ja'); clock.tick(SPEECH_PAUSE_MS - 1); assert.equal(ended, 0);
   clock.tick(1); assert.equal(ended, 1);
   wait.audio(silence(), 'ja'); clock.tick(2000); assert.equal(ended, 1);
+});
+
+test('0.3초보다 짧은 소리는 발화로 보지 않아 END를 보내지 않는다', () => {
+  const clock = fakeClock(); let ended = 0;
+  const wait = createVoiceWait({ ...clock, onPending: () => {}, onTouch: () => {}, onUtteranceEnd: () => { ended += 1; } });
+  wait.audio(blip(), 'ja'); clock.tick(SPEECH_PAUSE_MS * 2); assert.equal(ended, 0);
+  wait.audio(loud(), 'ja'); clock.tick(SPEECH_PAUSE_MS); assert.equal(ended, 1);
 });
 
 test('일본어·스페인어·태국어 선택은 12초를 적용하고 6~9초 정상 응답은 종료로 처리한다', () => {

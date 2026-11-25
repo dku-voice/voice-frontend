@@ -57,7 +57,7 @@ test('실제 WebSocket 수신 지점은 현재 음성 창에만 자동 전환하
       Selector(element.props).props.children.find((button) => button.props.lang === language).props.onClick();
     };
     const item = { menuId: 1, quantity: 3, optionIds: [10] };
-    start(); receive(first, { language: 'ja' }); assert.equal(app.languageRef.current, 'ko');
+    start(); receive(first, { language: 'ja', items: [{ menu_id: '1' }] }); assert.equal(app.languageRef.current, 'ko');
     await audio(); receive(first, { type: 'order', item, language: 'ja' });
     assert.equal(app.languageRef.current, 'ja');
     assert.deepEqual(trace.items, [item]);
@@ -66,17 +66,17 @@ test('실제 WebSocket 수신 지점은 현재 음성 창에만 자동 전환하
     receive(first, { type: 'order', item, language: 'th' });
     assert.equal(app.languageRef.current, 'es');
     assert.deepEqual(trace.items, [item, item], 'language rejection must not skip the legacy order handler');
-    await audio(); receive(first, { language: 'th' }); assert.equal(app.languageRef.current, 'th');
+    await audio(); receive(first, { language: 'th', items: [{ menu_id: '1' }] }); assert.equal(app.languageRef.current, 'th');
 
     await audio(); app.stopVoiceStreaming(false); start(); await audio();
-    receive(first, { language: 'es' }); assert.equal(app.languageRef.current, 'th');
-    await audio(); receive(first, { language: 'ko' }); assert.equal(app.languageRef.current, 'ko');
-    await audio(); choose('ko'); receive(first, { language: 'ja' }); assert.equal(app.languageRef.current, 'ko');
+    receive(first, { language: 'es', items: [{ menu_id: '1' }] }); assert.equal(app.languageRef.current, 'th');
+    await audio(); receive(first, { language: 'ko', items: [{ menu_id: '1' }] }); assert.equal(app.languageRef.current, 'ko');
+    await audio(); choose('ko'); receive(first, { language: 'ja', items: [{ menu_id: '1' }] }); assert.equal(app.languageRef.current, 'ko');
 
     first.readyState = 3; app.connectWebSocket(); const second = sockets[1];
     await audio(); receive(first, { type: 'order', item, language: 'es' });
     assert.equal(app.languageRef.current, 'ko'); assert.equal(trace.items.length, 2);
-    receive(second, { language: 'ja' }); assert.equal(app.languageRef.current, 'ja');
+    receive(second, { language: 'ja', items: [{ menu_id: '1' }] }); assert.equal(app.languageRef.current, 'ja');
     await audio(); receive(second, { type: 'order', item, language: null });
     assert.equal(app.languageRef.current, 'ja'); assert.equal(trace.items.length, 3);
     app.stopVoiceStreaming(false);

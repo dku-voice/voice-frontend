@@ -76,7 +76,7 @@ test('App은 9초 외국어 주문을 처리하고 12초 종료 후 늦은 응�
     const receive = (socket, data) => socket.onmessage({ data: JSON.stringify(data) });
     const silence = () => app.sendAudioToServer(new Int16Array(4096).buffer);
     app.selectLanguageManually('ko'); await app.startVoiceStreaming(); const first = sockets[0];
-    await app.sendAudioToServer(new Int16Array(4096).fill(3000).buffer); clock.tick(1600);
+    await app.sendAudioToServer(new Int16Array(8192).fill(3000).buffer); clock.tick(1600);
     assert.equal(first.sent.at(-1), 'END', '1600ms speech pause must finish the server recording');
     clock.tick(5000); assert.equal(first.readyState, 1); assert.equal(app.voiceSessionRef.current, true);
     clock.tick(4000); receive(first, { type: 'order', item, language: 'ja' });
@@ -113,7 +113,7 @@ test('App은 9초 외국어 주문을 처리하고 12초 종료 후 늦은 응�
     failedLate({ data: JSON.stringify({ type: 'order', item, language: 'ko' }) }); assert.equal(trace.cart[0].quantity, 4);
     await silence(); receive(recovered, { type: 'order', item });
     assert.equal(trace.cart[0].quantity, 5); assert.equal(app.languageRef.current, 'th');
-    await silence(); clock.tick(1000); receive(recovered, { language: 'es' });
+    await silence(); clock.tick(1000); receive(recovered, { language: 'es', items: [{ menu_id: '1' }] });
     assert.equal(app.voiceWaitRef.current.waiting, true, 'language alone must not end analysis wait');
     clock.tick(8000); assert.equal(recovered.readyState, 1);
     receive(recovered, { type: 'order', item });
