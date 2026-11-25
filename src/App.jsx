@@ -49,6 +49,7 @@ const toKdsCard = (order) => {
 
 const COMPLETE_RETURN_SECONDS = 30;
 const TTS_ECHO_GRACE_MS = 450;
+const PROMPT_MUTE_LIMIT_MS = 6000;
 const START_CAMERA_OPEN_MS = 5000;
 const START_CAMERA_ANALYZE_MS = 8000;
 const initialKioskStage = () => {
@@ -163,6 +164,7 @@ function App() {
   if (!voiceLanguageGuardRef.current) voiceLanguageGuardRef.current = createVoiceLanguageGuard();
   const ttsActiveRef = useRef(false);
   const ttsGraceTimerRef = useRef(null);
+  const promptMuteTimerRef = useRef(null);
   const ttsUtteranceRef = useRef(null);
   const ttsVoicesRef = useRef([]);
   const ttsRequestRef = useRef(0);
@@ -373,7 +375,16 @@ function App() {
     });
   };
 
+  const muteUntilPromptEnds = () => {
+    pauseMicForTts();
+    clearTimeout(promptMuteTimerRef.current);
+    promptMuteTimerRef.current = setTimeout(() => {
+      if (ttsActiveRef.current) resumeMicAfterTts();
+    }, PROMPT_MUTE_LIMIT_MS);
+  };
+
   const resumeMicAfterTts = () => {
+    clearTimeout(promptMuteTimerRef.current);
     streamRef.current?.getAudioTracks().forEach((track) => {
       track.enabled = true;
     });
@@ -394,6 +405,7 @@ function App() {
     }
 
     const synthesis = window.speechSynthesis;
+    ttsUtteranceRef.current = null;
     synthesis.cancel();
     const language = languageRef.current;
     const locale = localeFor(language);
@@ -742,6 +754,7 @@ function App() {
       voiceSessionRef.current = true;
       setIsRecording(true);
       setError('');
+      muteUntilPromptEnds();
       speak('원하는 메뉴를 말씀해 주세요.');
     } catch (failure) {
       if (!current()) return;
