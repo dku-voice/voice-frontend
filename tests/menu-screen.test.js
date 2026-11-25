@@ -75,7 +75,7 @@ test('품절은 가격과 품절 표시를 유지하며 담기를 막고 비활�
   assert(html.includes('<h3>데리버거</h3>'));
   assert(html.includes('2,800원 · 품절'));
   assert.match(html, /<button[^>]*disabled=""[^>]*>담기<\/button>/);
-  assert(!html.includes('<h3>리아 새우버거</h3>'));
+  assert(!html.includes('<h3>새우버거</h3>'));
 });
 
 test('서버가 비어 있거나 조회가 실패하면 임시 메뉴를 만들지 않고 이전 데이터도 주문을 차단한다', async () => {

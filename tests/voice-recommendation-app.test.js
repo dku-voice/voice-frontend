@@ -6,7 +6,7 @@ import { createServer } from 'vite';
 import { groupMenus, normalizeMenus } from '../src/domain/kiosk.js';
 
 const menus = groupMenus(normalizeMenus([
-  { menuId: 2, nameKo: '리아 새우버거', price: 4800, status: 'ACTIVE', categoryNameKo: '버거', options: [] },
+  { menuId: 2, nameKo: '새우버거', price: 4800, status: 'ACTIVE', categoryNameKo: '버거', options: [] },
   { menuId: 14, nameKo: '콜라', price: 2100, status: 'ACTIVE', categoryNameKo: '음료', options: [] },
   { menuId: 17, nameKo: '아이스아메리카노', price: 2500, status: 'SOLD_OUT', categoryNameKo: '음료', options: [] },
 ]));
@@ -71,7 +71,7 @@ test('음성 추천 응답은 장바구니를 건드리지 않고 이유와 함�
     await app.sendAudioToServer(new Int16Array(128).fill(3000).buffer);
     state.sockets[0].onmessage({ data: JSON.stringify({ type: 'recommendation', recognized_text: '산뜻한 거 추천해줘',
       language: 'ko', source: 'llm', items: [
-        { menu_id: '2', name: '리아 새우버거', reason: '산뜻함 특징이 있습니다.' },
+        { menu_id: '2', name: '새우버거', reason: '산뜻함 특징이 있습니다.' },
         { menu_id: '999', name: '없는 메뉴', reason: '무시' },
       ] }) });
     assert.deepEqual(state.trace.cart, []);
@@ -115,7 +115,7 @@ test('추천 화면은 요청 문장, 추천 이유, 판매 상태에 맞는 담
     assert(state.html.includes('말씀하신 내용에 맞춰 고른 메뉴입니다.'));
     assert(state.html.includes('시원한 거 추천해줘'));
     assert(state.html.includes('산뜻함 특징이 있습니다.'));
-    assert(state.html.includes('<h3>리아 새우버거</h3>'));
+    assert(state.html.includes('<h3>새우버거</h3>'));
     assert.equal((state.html.match(/<button class="primary" disabled=""[^>]*>장바구니 담기<\/button>/g) || []).length, 1);
   } finally { await state.close(); }
 });
