@@ -48,7 +48,7 @@ const toKdsCard = (order) => {
 };
 
 const COMPLETE_RETURN_SECONDS = 30;
-const TTS_ECHO_GRACE_MS = 450;
+const TTS_ECHO_GRACE_MS = 250;
 const PROMPT_MUTE_LIMIT_MS = 6000;
 const START_CAMERA_OPEN_MS = 5000;
 const START_CAMERA_ANALYZE_MS = 8000;
@@ -94,6 +94,7 @@ function App() {
   const [completeCountdown, setCompleteCountdown] = useState(0);
   const [error, setError] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [micMuted, setMicMuted] = useState(false);
   const [voiceFinalizing, setVoiceFinalizing] = useState(false);
   const [noiseEngine, setNoiseEngine] = useState('대기 중');
   const [cameraState, setCameraState] = useState({ phase: 'idle', error: null, result: null });
@@ -370,6 +371,7 @@ function App() {
   const pauseMicForTts = () => {
     clearTimeout(ttsGraceTimerRef.current);
     ttsActiveRef.current = true;
+    setMicMuted(true);
     streamRef.current?.getAudioTracks().forEach((track) => {
       track.enabled = false;
     });
@@ -388,10 +390,14 @@ function App() {
     streamRef.current?.getAudioTracks().forEach((track) => {
       track.enabled = true;
     });
-    if (!ttsActiveRef.current) return;
+    if (!ttsActiveRef.current) {
+      setMicMuted(false);
+      return;
+    }
     clearTimeout(ttsGraceTimerRef.current);
     ttsGraceTimerRef.current = setTimeout(() => {
       ttsActiveRef.current = false;
+      setMicMuted(false);
     }, TTS_ECHO_GRACE_MS);
   };
 
@@ -1635,6 +1641,9 @@ function App() {
           : '서버 메뉴를 다시 불러온 뒤 주문할 수 있습니다.'}</p>}
         <button type="button" disabled={menuLoading || checkoutBusy} onClick={loadMenus}>메뉴 다시 불러오기</button>
         {needSnapshotTouch && <p className="hint">화면 터치로 주문할 수 있습니다.</p>}
+        {isRecording && !voiceFinalizing && <p className={`listen-cue ${micMuted ? 'waiting' : 'live'}`} role="status">
+          {micMuted ? '안내가 끝나면 말씀해 주세요' : '지금 말씀하세요'}
+        </p>}
         <div className="action-row">
           <button className="primary" disabled={voiceFinalizing} onClick={isRecording ? finishVoiceStreaming : startVoiceStreaming}>
             {voiceFinalizing ? '음성 처리 중…' : isRecording ? '음성 중지' : '음성 시작'}

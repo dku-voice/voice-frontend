@@ -596,3 +596,27 @@ summary { cursor: pointer; }
   color: var(--muted, #555);
   text-align: left;
 }
+
+.listen-cue {
+  margin: 0.5rem 0;
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-align: center;
+}
+.listen-cue.waiting {
+  background: #eceff3;
+  color: #5b6472;
+}
+.listen-cue.live {
+  background: #e03131;
+  color: #fff;
+  animation: listen-pulse 1.2s ease-in-out infinite;
+}
+@keyframes listen-pulse {
+  50% { opacity: 0.75; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listen-cue.live { animation: none; }
+}

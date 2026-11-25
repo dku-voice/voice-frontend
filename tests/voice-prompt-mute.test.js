@@ -20,3 +20,12 @@ test('새 안내가 이전 안내를 끊을 때 이전 안내의 종료 신호�
   assert(detach !== -1 && detach < cancel);
   assert.match(speak, /if \(ttsUtteranceRef\.current !== utterance\) return;/);
 });
+
+test('마이크가 실제로 켜졌을 때만 지금 말씀하세요를 보여 준다', () => {
+  const pause = source.slice(source.indexOf('const pauseMicForTts'), source.indexOf('const muteUntilPromptEnds'));
+  assert.match(pause, /setMicMuted\(true\);/);
+  const resume = source.slice(source.indexOf('const resumeMicAfterTts'), source.indexOf('const speak = (text) =>'));
+  const grace = resume.slice(resume.indexOf('ttsGraceTimerRef.current = setTimeout'));
+  assert.match(grace, /ttsActiveRef\.current = false;\s*setMicMuted\(false\);/);
+  assert.match(source, /micMuted \? '안내가 끝나면 말씀해 주세요' : '지금 말씀하세요'/);
+});

@@ -2063,6 +2063,16 @@ export const messages = {
     "es": "No se pudieron confirmar el menú, la cantidad o las opciones del pedido por voz.",
     "th": "ไม่สามารถยืนยันเมนู จำนวน หรือตัวเลือกของคำสั่งซื้อด้วยเสียงได้"
   },
+  "지금 말씀하세요": {
+    "ja": "どうぞお話しください",
+    "es": "Hable ahora",
+    "th": "พูดได้เลย"
+  },
+  "안내가 끝나면 말씀해 주세요": {
+    "ja": "案内が終わったらお話しください",
+    "es": "Hable cuando termine el aviso",
+    "th": "กรุณาพูดหลังจากเสียงแนะนำจบ"
+  },
   "{name} {quantity}개": {
     "ja": "{name}{quantity}個",
     "es": "{quantity} {name}",
