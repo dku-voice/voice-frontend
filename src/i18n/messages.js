@@ -998,6 +998,36 @@ export const messages = {
     "es": "Modo demostración: mostrar aviso para mayores de 60 al iniciar",
     "th": "โหมดสาธิต: แสดงคำแนะนำสำหรับผู้มีอายุ 60 ปีขึ้นไปเมื่อเริ่มสั่ง"
   },
+  "추천 메뉴를 보여 드릴게요.": {
+    "ja": "おすすめメニューをお見せします。",
+    "es": "Le mostramos los productos recomendados.",
+    "th": "นี่คือเมนูแนะนำค่ะ"
+  },
+  "추천할 메뉴를 찾지 못했습니다. 다시 말씀하거나 화면 터치로 주문해 주세요.": {
+    "ja": "おすすめできるメニューが見つかりませんでした。もう一度お話しいただくか、画面タッチで注文してください。",
+    "es": "No encontramos productos para recomendar. Vuelva a hablar o haga su pedido tocando la pantalla.",
+    "th": "ไม่พบเมนูที่จะแนะนำ กรุณาพูดอีกครั้งหรือสั่งด้วยการแตะหน้าจอ"
+  },
+  "말씀하신 내용에 맞춰 고른 메뉴입니다.": {
+    "ja": "お話しいただいた内容に合わせて選んだメニューです。",
+    "es": "Productos elegidos según lo que nos dijo.",
+    "th": "เมนูที่เลือกตามที่คุณพูด"
+  },
+  "요청: {query}": {
+    "ja": "リクエスト: {query}",
+    "es": "Solicitud: {query}",
+    "th": "คำขอ: {query}"
+  },
+  "다른 추천을 원하시면 음성 시작을 누르고 다시 말씀해 주세요.": {
+    "ja": "別のおすすめが必要な場合は、音声開始を押してもう一度お話しください。",
+    "es": "Para otra recomendación, pulse Iniciar voz y vuelva a hablar.",
+    "th": "หากต้องการคำแนะนำอื่น กดเริ่มเสียงแล้วพูดอีกครั้ง"
+  },
+  "음성 추천": {
+    "ja": "音声おすすめ",
+    "es": "Recomendación por voz",
+    "th": "แนะนำด้วยเสียง"
+  },
   "음성 주문을 시작할 수 있습니다.": {
     "ja": "音声注文を開始できます。",
     "es": "Ya puede pedir por voz.",
