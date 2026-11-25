@@ -588,3 +588,11 @@ input:not([type='checkbox']):not([type='radio']) {
 summary { cursor: pointer; }
 .high-contrast input { background: #111; color: #fff; }
 .high-contrast .error { color: #ffaaaa; }
+
+.recommendation-reason {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--muted, #555);
+  text-align: left;
+}

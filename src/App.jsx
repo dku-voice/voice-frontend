@@ -78,6 +78,7 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [cart, setCart] = useState(() => checkoutRef.current.getSaved()?.phase === 'paid' ? [] : checkoutRef.current.restoreCart());
   const [recommendations, setRecommendations] = useState([]);
+  const [voiceRecommendation, setVoiceRecommendation] = useState(null);
   const [kdsOrders, setKdsOrders] = useState([]);
   const [adminLogs, setAdminLogs] = useState([]);
   const [wsStatus, setWsStatus] = useState('closed');
@@ -512,6 +513,26 @@ function App() {
       return;
     }
 
+    if (data.type === 'recommendation' && typeof data.recognized_text === 'string') {
+      clearResponseDelay();
+      stopVoiceStreaming(false);
+      const picks = (Array.isArray(data.items) ? data.items : []).map((item) => {
+        const menu = resolveMenu({ menuId: Number(item?.menu_id), name: item?.name });
+        if (!menu) return null;
+        return { menu, reason: typeof item?.reason === 'string' ? item.reason.trim() : '' };
+      }).filter(Boolean);
+      if (data.recognized_text) setMessage(`인식 내용: ${data.recognized_text}`);
+      addAuditLog('음성 추천', `${picks.length}건 (${data.source === 'llm' ? 'AI' : '규칙'})`);
+      if (!picks.length) {
+        setError('추천할 메뉴를 찾지 못했습니다. 다시 말씀하거나 화면 터치로 주문해 주세요.');
+        return;
+      }
+      setVoiceRecommendation({ query: data.recognized_text, items: picks });
+      if (currentScreenRef.current !== 'payment') setCurrentScreen('recommendations');
+      speakRef.current?.('추천 메뉴를 보여 드릴게요.');
+      return;
+    }
+
     if (isVoiceOrderResponse(data)) {
       try {
         const result = normalizeVoiceOrderResponse(data, menuItemsRef.current);
@@ -931,6 +952,7 @@ function App() {
     }
     cancelCamera();
     setCompleteCountdown(0);
+    setVoiceRecommendation(null);
     setStartPhase('idle');
     setError('');
     setReceipt(null);
@@ -1540,6 +1562,7 @@ function App() {
       <nav className="nav-buttons" aria-label="화면 이동">
         {[
           ['menu', '메뉴'],
+          ['recommendations', '추천'],
           ['cart', `장바구니 ${totalQuantity}`],
           ['kds', 'KDS'],
           ['admin', '관리자'],
@@ -1702,7 +1725,32 @@ function App() {
     </main>
   );
 
-  const renderRecommendations = () => (
+  const renderVoiceRecommendations = () => (
+    <main className="screen">
+      <div className="screen-heading">
+        <h2>추천 메뉴</h2>
+        <p>말씀하신 내용에 맞춰 고른 메뉴입니다.</p>
+      </div>
+      <p className="hint">요청: {voiceRecommendation.query}</p>
+      <div className="recommendation-list">
+        {voiceRecommendation.items.map(({ menu, reason }) => {
+          const current = allMenuItems.find((item) => item.menuId === menu.menuId) || menu;
+          return (
+            <article key={current.id} className="recommendation-card">
+              <div className="item-image">{renderMenuImage(current)}</div>
+              <h3>{current.name}</h3>
+              <p>{formatPrice(current.price)}</p>
+              {reason && <p className="recommendation-reason">{reason}</p>}
+              <button className="primary" disabled={menuSource !== 'server' || current.status !== 'ACTIVE' || checkoutBusy} onClick={() => addToCart(current)}>장바구니 담기</button>
+            </article>
+          );
+        })}
+      </div>
+      <p className="hint">다른 추천을 원하시면 음성 시작을 누르고 다시 말씀해 주세요.</p>
+    </main>
+  );
+
+  const renderRecommendations = () => voiceRecommendation ? renderVoiceRecommendations() : (
     <main className="screen">
       <div className="screen-heading">
         <h2>추천 메뉴</h2>

@@ -37,7 +37,7 @@ test('기존 메뉴와 결제 영역을 유지하고 최종 결제 버튼 하나
           assert(!html.includes('카메라 미리보기'));
           assert(!/\d+세/.test(html));
           assert(!html.includes('5초 지연 테스트'));
-          assert(!html.includes('>추천</button>'));
+          assert(html.includes('>추천</button>'));
         } else {
           assert(html.includes('장바구니로 돌아가기'));
           assert.equal((html.match(/>결제하기<\/button>/g) || []).length, 1);
