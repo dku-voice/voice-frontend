@@ -20,7 +20,7 @@ test('App은 9초 외국어 주문을 처리하고 12초 종료 후 늦은 응�
     readyState = 1;
     sent = [];
     constructor() { super(); sockets.push(this); }
-    send(data) { assert(data instanceof ArrayBuffer || data === 'END'); this.sent.push(data); }
+    send(data) { assert(data instanceof ArrayBuffer || /^END:(ko|ja|es|th)$/.test(data)); this.sent.push(data); }
     close() { this.readyState = 3; this.onclose?.(); }
   }
   class AudioContext {
@@ -77,7 +77,7 @@ test('App은 9초 외국어 주문을 처리하고 12초 종료 후 늦은 응�
     const silence = () => app.sendAudioToServer(new Int16Array(4096).buffer);
     app.selectLanguageManually('ko'); await app.startVoiceStreaming(); const first = sockets[0];
     await app.sendAudioToServer(new Int16Array(8192).fill(3000).buffer); clock.tick(1600);
-    assert.equal(first.sent.at(-1), 'END', '1600ms speech pause must finish the server recording');
+    assert.equal(first.sent.at(-1), 'END:ko', '1600ms speech pause must finish the server recording');
     clock.tick(5000); assert.equal(first.readyState, 1); assert.equal(app.voiceSessionRef.current, true);
     clock.tick(4000); receive(first, { type: 'order', item, language: 'ja' });
     assert.equal(trace.cart[0].quantity, 1); assert.equal(app.languageRef.current, 'ja'); assert.equal(clock.count, 0);
@@ -120,7 +120,7 @@ test('App은 9초 외국어 주문을 처리하고 12초 종료 후 늦은 응�
     assert.equal(trace.cart[0].quantity, 6); assert.equal(app.languageRef.current, 'es'); assert.equal(clock.count, 0);
     app.stopVoiceStreaming(true); assert.equal(clock.count, 0);
     await app.startVoiceStreaming(); const manual = sockets.at(-1);
-    app.finishVoiceStreaming(); assert.equal(manual.sent.at(-1), 'END', 'manual recording stop must send END');
+    app.finishVoiceStreaming(); assert.equal(manual.sent.at(-1), 'END:es', 'manual recording stop must send END');
     assert.equal(app.voiceSessionRef.current, true, 'session remains active until the AI result arrives');
   } finally {
     trace.bridge?.stopVoiceStreaming(false);
