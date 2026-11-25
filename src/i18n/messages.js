@@ -1218,15 +1218,15 @@ export const messages = {
     "es": "Hamburguesa teriyaki",
     "th": "เบอร์เกอร์เทอริยากิ"
   },
-  "리아 새우버거": {
-    "ja": "リア海老バーガー",
-    "es": "Hamburguesa de camarones Ria",
-    "th": "เบอร์เกอร์กุ้งรีอา"
+  "새우버거": {
+    "ja": "エビバーガー",
+    "es": "Hamburguesa de camarón",
+    "th": "เบอร์เกอร์กุ้ง"
   },
-  "리아 불고기버거": {
-    "ja": "リアプルコギバーガー",
-    "es": "Hamburguesa bulgogi Ria",
-    "th": "เบอร์เกอร์บุลโกกิรีอา"
+  "불고기버거": {
+    "ja": "プルコギバーガー",
+    "es": "Hamburguesa Bulgogi",
+    "th": "บูลโกกิเบอร์เกอร์"
   },
   "클래식 치즈버거": {
     "ja": "クラシックチーズバーガー",
@@ -1248,7 +1248,7 @@ export const messages = {
     "es": "Hamburguesa clásica doble con queso",
     "th": "ดับเบิลคลาสสิกชีสเบอร์เกอร์"
   },
-  "모짜렐라 베이컨버거": {
+  "모짜렐라 베이컨 버거": {
     "ja": "モッツァレラベーコンバーガー",
     "es": "Hamburguesa con mozzarella y beicon",
     "th": "เบอร์เกอร์มอซซาเรลลาเบคอน"
@@ -1268,7 +1268,7 @@ export const messages = {
     "es": "Palitos de queso",
     "th": "ชีสสติ๊ก"
   },
-  "통오징어링": {
+  "오징어링": {
     "ja": "イカリング",
     "es": "Aros de calamar",
     "th": "ปลาหมึกวงทอด"

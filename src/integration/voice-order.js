@@ -5,7 +5,7 @@ import { supportedLanguage, translate } from '../i18n/index.js';
 // backend instead of freezing today's numeric IDs in the frontend.
 const AI_MENU_NAMES = Object.freeze({
   'classic-burger': '클래식 치즈버거',
-  'bulgogi-burger': '리아 불고기버거',
+  'bulgogi-burger': '불고기버거',
   'chicken-burger': '핫크리스피 치킨버거',
   fries_01: '감자튀김',
   nuggets: '치킨너겟',
