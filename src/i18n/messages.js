@@ -2043,6 +2043,16 @@ export const messages = {
     "es": "Se ha añadido {name} al carrito.",
     "th": "เพิ่ม {name} ลงตะกร้าแล้ว"
   },
+  "{items}를 장바구니에 담았습니다.": {
+    "ja": "{items}をカートに追加しました。",
+    "es": "Se ha añadido al carrito: {items}.",
+    "th": "เพิ่ม {items} ลงตะกร้าแล้ว"
+  },
+  "{name} {quantity}개": {
+    "ja": "{name}{quantity}個",
+    "es": "{quantity} {name}",
+    "th": "{name} {quantity} ชิ้น"
+  },
   "(재연결 {count}/5)": {
     "ja": "(再接続 {count}/5)",
     "es": "(Reconexión {count}/5)",

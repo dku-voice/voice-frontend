@@ -21,9 +21,12 @@ export function storeLanguage(language) {
 }
 
 const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const numericNames = new Set(['count', 'quantity', 'age']);
+const capture = (name) => (numericNames.has(name) ? '(\\d+)' : name === 'name' ? '([^,]+?)' : '(.+?)');
 const templates = Object.keys(messages).filter((key) => key.includes('{')).map((key) => {
   const names = [...key.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
-  const pattern = '^' + key.split(/\{\w+\}/g).map(escape).join('(.+?)') + '$';
+  const parts = key.split(/\{\w+\}/g).map(escape);
+  const pattern = '^' + parts.reduce((joined, part, index) => joined + (index ? capture(names[index - 1]) : '') + part, '') + '$';
   return { key, names, pattern: new RegExp(pattern, 'u') };
 });
 
