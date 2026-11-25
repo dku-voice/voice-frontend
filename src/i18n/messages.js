@@ -1248,7 +1248,7 @@ export const messages = {
     "es": "Hamburguesa clásica doble con queso",
     "th": "ดับเบิลคลาสสิกชีสเบอร์เกอร์"
   },
-  "모짜렐라 베이컨버거": {
+  "모짜렐라 베이컨 버거": {
     "ja": "モッツァレラベーコンバーガー",
     "es": "Hamburguesa con mozzarella y beicon",
     "th": "เบอร์เกอร์มอซซาเรลลาเบคอน"
@@ -1268,7 +1268,7 @@ export const messages = {
     "es": "Palitos de queso",
     "th": "ชีสสติ๊ก"
   },
-  "통오징어링": {
+  "오징어링": {
     "ja": "イカリング",
     "es": "Aros de calamar",
     "th": "ปลาหมึกวงทอด"

@@ -4,7 +4,7 @@ import { normalizeMenus } from '../src/domain/kiosk.js';
 import { isVoiceOrderResponse, normalizeVoiceOrderResponse, voiceMenuMappings } from '../src/integration/voice-order.js';
 
 const menus = normalizeMenus([
-  { menuId: 4, nameKo: '클래식 치즈버거', nameEn: 'Classic Cheese Burger', price: 5200, status: 'ACTIVE', categoryNameKo: '버거',
+  { menuId: 4, nameKo: '클래식 치즈버거', nameEn: 'Classic Cheeseburger', price: 5200, status: 'ACTIVE', categoryNameKo: '버거',
     options: [{ optionId: 4, nameKo: '치즈 추가', nameEn: 'Add Cheese', optionType: 'ADD', extraPrice: 500 }] },
   { menuId: 10, nameKo: '감자튀김', nameEn: 'French Fries', price: 2200, status: 'ACTIVE', categoryNameKo: '사이드', options: [] },
   { menuId: 14, nameKo: '콜라', nameEn: 'Cola', price: 2100, status: 'ACTIVE', categoryNameKo: '음료', options: [] },
