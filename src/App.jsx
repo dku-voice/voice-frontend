@@ -804,7 +804,7 @@ function App() {
     const socket = wsRef.current;
     if (!voiceSessionRef.current || voiceEndSentRef.current || socket?.readyState !== WebSocket.OPEN) return false;
     try {
-      socket.send('END');
+      socket.send(`END:${languageRef.current}`);
       voiceEndSentRef.current = true;
       setVoiceFinalizing(true);
       setMessage('음성 분석 결과를 기다리고 있습니다.');
