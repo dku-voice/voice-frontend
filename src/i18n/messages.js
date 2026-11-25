@@ -998,6 +998,116 @@ export const messages = {
     "es": "Modo demostración: mostrar aviso para mayores de 60 al iniciar",
     "th": "โหมดสาธิต: แสดงคำแนะนำสำหรับผู้มีอายุ 60 ปีขึ้นไปเมื่อเริ่มสั่ง"
   },
+  "'{tag}' 특징이 있는 메뉴입니다.": {
+    "ja": "「{tag}」の特徴があるメニューです。",
+    "es": "Tiene la característica «{tag}».",
+    "th": "เป็นเมนูที่มีลักษณะ '{tag}'"
+  },
+  "'{term}' 조건과 연결되는 메뉴입니다.": {
+    "ja": "「{term}」の条件に合うメニューです。",
+    "es": "Coincide con «{term}».",
+    "th": "เป็นเมนูที่ตรงกับ '{term}'"
+  },
+  "가격이 낮은 순으로 골랐습니다. ({price}원)": {
+    "ja": "価格の安い順に選びました。（{price}ウォン）",
+    "es": "Elegido por precio más bajo. ({price} wones)",
+    "th": "เลือกตามราคาที่ต่ำที่สุด ({price} วอน)"
+  },
+  "{label} 수치가 높은 순으로 골랐습니다. ({value})": {
+    "ja": "{label}が多い順に選びました。（{value}）",
+    "es": "Elegido por mayor {label}. ({value})",
+    "th": "เลือกตาม{label}ที่สูงที่สุด ({value})"
+  },
+  "{label} 수치가 낮은 순으로 골랐습니다. ({value})": {
+    "ja": "{label}が少ない順に選びました。（{value}）",
+    "es": "Elegido por menor {label}. ({value})",
+    "th": "เลือกตาม{label}ที่ต่ำที่สุด ({value})"
+  },
+  "대표 메뉴입니다.": {
+    "ja": "看板メニューです。",
+    "es": "Es uno de nuestros productos estrella.",
+    "th": "เป็นเมนูแนะนำประจำร้าน"
+  },
+  "현재 메뉴 문서에서 추천 후보로 선택했습니다.": {
+    "ja": "現在のメニューからおすすめ候補として選びました。",
+    "es": "Seleccionado entre los productos disponibles.",
+    "th": "เลือกจากเมนูที่มีอยู่ในขณะนี้"
+  },
+  "산뜻함": {
+    "ja": "さっぱり",
+    "es": "refrescante",
+    "th": "สดชื่น"
+  },
+  "달콤함": {
+    "ja": "甘い",
+    "es": "dulce",
+    "th": "หวาน"
+  },
+  "바삭함": {
+    "ja": "サクサク",
+    "es": "crujiente",
+    "th": "กรอบ"
+  },
+  "부드러움": {
+    "ja": "やわらか",
+    "es": "suave",
+    "th": "นุ่ม"
+  },
+  "고소함": {
+    "ja": "香ばしい",
+    "es": "sabroso",
+    "th": "หอมมัน"
+  },
+  "매콤함": {
+    "ja": "ピリ辛",
+    "es": "picante",
+    "th": "เผ็ด"
+  },
+  "채소 많음": {
+    "ja": "野菜たっぷり",
+    "es": "con muchas verduras",
+    "th": "ผักเยอะ"
+  },
+  "간편함": {
+    "ja": "手軽",
+    "es": "fácil de llevar",
+    "th": "ทานง่าย"
+  },
+  "아이 추천": {
+    "ja": "お子様におすすめ",
+    "es": "recomendado para niños",
+    "th": "แนะนำสำหรับเด็ก"
+  },
+  "대표 메뉴": {
+    "ja": "看板メニュー",
+    "es": "producto estrella",
+    "th": "เมนูแนะนำประจำร้าน"
+  },
+  "1인 추천": {
+    "ja": "おひとり様向け",
+    "es": "para una persona",
+    "th": "สำหรับหนึ่งคน"
+  },
+  "지방": {
+    "ja": "脂質",
+    "es": "grasa",
+    "th": "ไขมัน"
+  },
+  "칼로리": {
+    "ja": "カロリー",
+    "es": "calorías",
+    "th": "แคลอรี"
+  },
+  "나트륨": {
+    "ja": "ナトリウム",
+    "es": "sodio",
+    "th": "โซเดียม"
+  },
+  "단백질": {
+    "ja": "たんぱく質",
+    "es": "proteína",
+    "th": "โปรตีน"
+  },
   "추천 메뉴를 보여 드릴게요.": {
     "ja": "おすすめメニューをお見せします。",
     "es": "Le mostramos los productos recomendados.",
