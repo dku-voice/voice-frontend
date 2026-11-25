@@ -48,6 +48,7 @@ const toKdsCard = (order) => {
 };
 
 const COMPLETE_RETURN_SECONDS = 30;
+const TTS_ECHO_GRACE_MS = 450;
 const START_CAMERA_OPEN_MS = 5000;
 const START_CAMERA_ANALYZE_MS = 8000;
 const initialKioskStage = () => {
@@ -161,6 +162,7 @@ function App() {
   const voiceLanguageGuardRef = useRef(null);
   if (!voiceLanguageGuardRef.current) voiceLanguageGuardRef.current = createVoiceLanguageGuard();
   const ttsActiveRef = useRef(false);
+  const ttsGraceTimerRef = useRef(null);
   const ttsUtteranceRef = useRef(null);
   const ttsVoicesRef = useRef([]);
   const ttsRequestRef = useRef(0);
@@ -364,6 +366,7 @@ function App() {
   //  - 캡처 트랙을 비활성화해 AudioWorklet 이 무음만 받도록 하고
   //  - 캡처 프레임 전달 게이트(ttsActiveRef)로 한 번 더 차단한다.
   const pauseMicForTts = () => {
+    clearTimeout(ttsGraceTimerRef.current);
     ttsActiveRef.current = true;
     streamRef.current?.getAudioTracks().forEach((track) => {
       track.enabled = false;
@@ -371,10 +374,14 @@ function App() {
   };
 
   const resumeMicAfterTts = () => {
-    ttsActiveRef.current = false;
     streamRef.current?.getAudioTracks().forEach((track) => {
       track.enabled = true;
     });
+    if (!ttsActiveRef.current) return;
+    clearTimeout(ttsGraceTimerRef.current);
+    ttsGraceTimerRef.current = setTimeout(() => {
+      ttsActiveRef.current = false;
+    }, TTS_ECHO_GRACE_MS);
   };
 
   const speak = (text) => {

@@ -10,8 +10,9 @@ export function receiveVoiceMessage(raw, { voiceActive = false, currentLanguage 
   // local window. Do not interpret unknown messages as a new order protocol.
   const isResult = Object.hasOwn(data, 'language') || data.type === 'order';
   const canApply = isResult && canApplyLanguage();
+  const hasContent = (Array.isArray(data.items) && data.items.length > 0) || (data.type === 'order' && Boolean(data.item));
   const detected = voiceLanguage(data, currentLanguage);
-  if (voiceActive && canApply && detected !== currentLanguage) onLanguage(detected);
+  if (voiceActive && canApply && hasContent && detected !== currentLanguage) onLanguage(detected);
   if (voiceActive && canApply && supportedLanguage(data.language)) onLanguageDetected(detected);
   return data;
 }
@@ -46,6 +47,12 @@ export function createVoiceLanguageGuard() {
 // Existing worker output: mono 16 kHz signed Int16 PCM. This local activity
 // estimate does not claim that server analysis has started and changes no bytes.
 export const SPEECH_PAUSE_MS = 1600;
+export const MIN_SPEECH_SAMPLES = 4800;
+function sampleCount(pcm) {
+  if (pcm instanceof Int16Array) return pcm.length;
+  if (pcm instanceof ArrayBuffer) return Math.floor(pcm.byteLength / 2);
+  return 0;
+}
 export function hasVoiceActivity(pcm) {
   const samples = pcm instanceof Int16Array ? pcm
     : pcm instanceof ArrayBuffer && pcm.byteLength % 2 === 0 ? new Int16Array(pcm) : null;
@@ -70,6 +77,7 @@ export function createVoiceWait({ onPending, onTouch, onTimeout = () => {}, onRe
   let expiryTimer;
   let silenceTimer;
   let touched = false;
+  let voicedSamples = 0;
   const clearTimers = () => {
     cancel(pendingTimer); cancel(touchTimer); cancel(expiryTimer); cancel(silenceTimer);
   };
@@ -112,6 +120,7 @@ export function createVoiceWait({ onPending, onTouch, onTimeout = () => {}, onRe
         return;
       }
       const wasRecording = phase === 'recording';
+      voicedSamples = wasRecording ? voicedSamples + sampleCount(pcm) : sampleCount(pcm);
       clearTimers(); generation += 1;
       phase = 'recording'; startedAt = null; touched = false;
       language = supportedLanguage(nextLanguage) ? nextLanguage : null;
@@ -119,7 +128,9 @@ export function createVoiceWait({ onPending, onTouch, onTimeout = () => {}, onRe
       const token = generation;
       silenceTimer = schedule(() => {
         if (token === generation && phase === 'recording') {
-          onUtteranceEnd();
+          phase = 'idle';
+          if (voicedSamples >= MIN_SPEECH_SAMPLES) onUtteranceEnd();
+          voicedSamples = 0;
           start(language);
         }
       }, SPEECH_PAUSE_MS);

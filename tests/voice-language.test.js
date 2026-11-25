@@ -100,3 +100,14 @@ test('메시지 수신과 타이머 종료는 기존 status/items 응답을 임�
   const raw = { status: 'success', language: 'es', items: [{ menu_id: 'cola_01', quantity: 2, options: [] }] };
   assert.deepEqual(receiveVoiceMessage(JSON.stringify(raw)), raw);
 });
+
+test('메뉴나 추천 결과가 없는 응답으로는 화면 언어를 바꾸지 않는다', () => {
+  const changes = [];
+  const options = { voiceActive: true, currentLanguage: 'ja', onLanguage: (language) => changes.push(language) };
+  receiveVoiceMessage(JSON.stringify({ status: 'success', language: 'ko', items: [], recognized_text: '' }), options);
+  receiveVoiceMessage(JSON.stringify({ status: 'error', language: 'ko', items: [] }), options);
+  assert.deepEqual(changes, []);
+  receiveVoiceMessage(JSON.stringify({ status: 'success', language: 'es', items: [{ menu_id: '14', quantity: 2 }] }), options);
+  receiveVoiceMessage(JSON.stringify({ type: 'recommendation', language: 'th', recognized_text: 'x', items: [{ menu_id: '2' }] }), options);
+  assert.deepEqual(changes, ['es', 'th']);
+});

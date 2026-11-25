@@ -1108,6 +1108,36 @@ export const messages = {
     "es": "proteína",
     "th": "โปรตีน"
   },
+  "인식 내용: {text}": {
+    "ja": "認識内容: {text}",
+    "es": "Reconocido: {text}",
+    "th": "ข้อความที่ได้ยิน: {text}"
+  },
+  "음성 처리 중…": {
+    "ja": "音声を処理中…",
+    "es": "Procesando voz…",
+    "th": "กำลังประมวลผลเสียง…"
+  },
+  "음성 분석 결과를 기다리고 있습니다.": {
+    "ja": "音声の分析結果を待っています。",
+    "es": "Esperando el resultado del análisis de voz.",
+    "th": "กำลังรอผลการวิเคราะห์เสียง"
+  },
+  "인식된 메뉴가 없습니다. 다시 말씀하거나 화면 터치로 주문해 주세요.": {
+    "ja": "認識されたメニューがありません。もう一度お話しいただくか、画面タッチで注文してください。",
+    "es": "No se reconoció ningún producto. Vuelva a hablar o haga su pedido tocando la pantalla.",
+    "th": "ไม่พบเมนูที่ได้ยิน กรุณาพูดอีกครั้งหรือสั่งด้วยการแตะหน้าจอ"
+  },
+  "음성 주문을 처리하지 못했습니다. 다시 말씀하거나 화면 터치로 주문해 주세요.": {
+    "ja": "音声注文を処理できませんでした。もう一度お話しいただくか、画面タッチで注文してください。",
+    "es": "No pudimos procesar su pedido por voz. Vuelva a hablar o haga su pedido tocando la pantalla.",
+    "th": "ไม่สามารถประมวลผลคำสั่งด้วยเสียงได้ กรุณาพูดอีกครั้งหรือสั่งด้วยการแตะหน้าจอ"
+  },
+  "AI 서버에 녹음 종료 신호를 전송하지 못했습니다. 다시 시도해 주세요.": {
+    "ja": "AIサーバーに録音終了を送信できませんでした。もう一度お試しください。",
+    "es": "No se pudo enviar el fin de grabación al servidor de IA. Inténtelo de nuevo.",
+    "th": "ไม่สามารถส่งสัญญาณสิ้นสุดการบันทึกไปยังเซิร์ฟเวอร์ AI ได้ กรุณาลองอีกครั้ง"
+  },
   "추천 메뉴를 보여 드릴게요.": {
     "ja": "おすすめメニューをお見せします。",
     "es": "Le mostramos los productos recomendados.",
