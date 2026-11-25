@@ -2048,6 +2048,21 @@ export const messages = {
     "es": "Se ha añadido al carrito: {items}.",
     "th": "เพิ่ม {items} ลงตะกร้าแล้ว"
   },
+  "AI 음성 주문의 옵션 정보를 확인해 주세요.": {
+    "ja": "音声注文のオプション情報を確認できませんでした。",
+    "es": "No se pudieron confirmar las opciones del pedido por voz.",
+    "th": "ไม่สามารถยืนยันตัวเลือกของคำสั่งซื้อด้วยเสียงได้"
+  },
+  "서버 메뉴를 불러온 뒤 음성 주문을 이용해 주세요.": {
+    "ja": "メニューの読み込み後に音声注文をご利用ください。",
+    "es": "Use el pedido por voz cuando se haya cargado el menú.",
+    "th": "กรุณาสั่งด้วยเสียงหลังจากโหลดเมนูเสร็จแล้ว"
+  },
+  "AI 음성 주문의 메뉴·수량·옵션 형식을 확인해 주세요.": {
+    "ja": "音声注文のメニュー・数量・オプションを確認できませんでした。",
+    "es": "No se pudieron confirmar el menú, la cantidad o las opciones del pedido por voz.",
+    "th": "ไม่สามารถยืนยันเมนู จำนวน หรือตัวเลือกของคำสั่งซื้อด้วยเสียงได้"
+  },
   "{name} {quantity}개": {
     "ja": "{name}{quantity}個",
     "es": "{quantity} {name}",
