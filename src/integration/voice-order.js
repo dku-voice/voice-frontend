@@ -21,7 +21,7 @@ const plainObject = (value) => Boolean(value) && typeof value === 'object' && !A
 
 const optionNames = (option) => {
   const names = [option?.nameKo, option?.nameEn, option?.name];
-  for (const language of ['ja', 'es', 'th']) names.push(translate(option?.nameKo, language));
+  for (const language of ['en', 'ja', 'es', 'th']) names.push(translate(option?.nameKo, language));
   return new Set(names.map(normalizedText).filter(Boolean));
 };
 

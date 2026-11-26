@@ -59,7 +59,7 @@ test('음성 종료와 재시작 이후에도 이전 미확정 응답은 새 세
 });
 
 test('언어가 없거나 잘못된 기존 주문도 처리 경로에 남으며 다음 응답은 정상 전환한다', () => {
-  for (const language of [undefined, null, '', 'en', 'ja-JP', 'JA', ' ja ', 1, {}, []]) {
+  for (const language of [undefined, null, '', 'fr', 'ja-JP', 'JA', ' ja ', 1, {}, []]) {
     const flow = harness('es'); flow.start(); flow.audio();
     const data = { type: 'order', item: { menuId: 14, optionIds: [] }, language };
     const raw = JSON.parse(JSON.stringify(data));

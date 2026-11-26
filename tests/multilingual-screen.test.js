@@ -12,7 +12,7 @@ const cart = [createCartItem(menus[0], [1], 2)];
 const receipt = { orderId: 123, orderNumber: 'ORD-LOCAL-I18N', status: 'PAID', totalPrice: 6600,
   items: [{ menuId: 1, menuNameKo: '데리버거', quantity: 2, unitPrice: 3300, subtotal: 6600, options: [{ optionId: 1, nameKo: '치즈 추가' }] }] };
 
-test('4개 언어로 전체 화면·메뉴·옵션·장바구니·영수증·오류·KDS·관리자를 렌더하고 읽기만으로도 네트워크 요청을 하지 않는다', async () => {
+test('5개 언어로 전체 화면·메뉴·옵션·장바구니·영수증·오류·KDS·관리자를 렌더하고 읽기만으로도 네트워크 요청을 하지 않는다', async () => {
   const originalFetch = globalThis.fetch;
   let calls = 0;
   globalThis.fetch = () => { calls += 1; throw new Error('SSR에서 실제 요청 금지'); };
@@ -46,7 +46,7 @@ test('4개 언어로 전체 화면·메뉴·옵션·장바구니·영수증·오
           const { default: Selector } = await server.ssrLoadModule('/src/i18n/LanguageSelector.jsx');
           let chosen = language;
           const selector = Selector({ language, onChange: (value) => { chosen = value; } });
-          assert.equal(selector.props.children.length, 4);
+          assert.equal(selector.props.children.length, 5);
           for (const button of selector.props.children) {
             button.props.onClick();
             assert.equal(chosen, button.props.lang, 'each real button handler must select its own language');

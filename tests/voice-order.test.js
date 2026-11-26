@@ -49,7 +49,7 @@ test('새 AI 응답의 오류·빈 주문은 안전하게 반환하고 잘못된
   const base = { status: 'success', recognized_text: '주문', error_msg: null, language: 'ja' };
   assert.throws(() => normalizeVoiceOrderResponse({ ...base, items: [{ menu_id: 'unknown-menu', quantity: 1, options: [] }] }, menus), /매핑/);
   assert.throws(() => normalizeVoiceOrderResponse({ ...base, items: [{ menu_id: 'cola_01', quantity: 0, options: [] }] }, menus), /형식/);
-  assert.throws(() => normalizeVoiceOrderResponse({ ...base, language: 'en', items: [] }, menus), /응답 형식/);
+  assert.throws(() => normalizeVoiceOrderResponse({ ...base, language: 'fr', items: [] }, menus), /응답 형식/);
   assert.throws(() => normalizeVoiceOrderResponse({ ...base, items: [{ menu_id: 'classic-burger', quantity: 1, options: ['없는 옵션'] }] }, menus), /옵션/);
   assert.equal(Object.hasOwn(voiceMenuMappings(), 'burger_01'), false, 'ambiguous AI IDs must not be guessed');
 });

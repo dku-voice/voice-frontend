@@ -1,4 +1,5 @@
 const preferences = {
+  en: ['aria', 'jenny', 'samantha', 'zira', 'google us english'],
   ja: ['nanami', 'kyoko', 'haruka', 'sayaka', 'otoya', 'google 日本語'],
   es: ['elvira', 'dalia', 'monica', 'paulina', 'alvaro', 'jorge', 'google español'],
   th: ['premwadee', 'achara', 'kanya', 'narisa', 'google ไทย'],
@@ -6,6 +7,7 @@ const preferences = {
 
 const settings = {
   ko: { rate: 1, pitch: 1 },
+  en: { rate: 0.98, pitch: 1 },
   ja: { rate: 0.96, pitch: 1 },
   es: { rate: 0.98, pitch: 1 },
   th: { rate: 0.94, pitch: 1 },

@@ -49,7 +49,7 @@ test('대기 중 수동 언어 변경은 시작 시각을 보존하고 잘못된
   const wait = createVoiceWait({ ...fake, onPending: () => {}, onTouch: (event) => events.push(event) });
   wait.start('ko'); fake.tick(4000); wait.changeLanguage('th');
   fake.tick(1000); assert.deepEqual(events, []);
-  wait.changeLanguage('en'); fake.tick(6999); assert.deepEqual(events, []);
+  wait.changeLanguage('fr'); fake.tick(6999); assert.deepEqual(events, []);
   fake.tick(1); assert.deepEqual(events, [{ language: 'th', deadline: 12000 }]);
   wait.finish();
   wait.start('ja'); fake.tick(4000); wait.changeLanguage('ko'); fake.tick(1000);
@@ -86,7 +86,7 @@ test('자동 전환은 음성 시작 이후 지원 언어에만 적용하고 기
     const data = receiveVoiceMessage(JSON.stringify(raw), { voiceActive: true, currentLanguage: language === 'ko' ? 'th' : 'ko', onLanguage: (l) => events.push(l) });
     assert.deepEqual(events, [language]); assert.deepEqual(data, raw);
   }
-  for (const value of [undefined, null, '', 'en', 'ja-JP', 'JA', ' ja ', 1, {}, []]) {
+  for (const value of [undefined, null, '', 'fr', 'ja-JP', 'JA', ' ja ', 1, {}, []]) {
     assert.equal(voiceLanguage({ language: value }, 'es'), 'es');
     receiveVoiceMessage(JSON.stringify({ type: 'order', language: value, item: { menuId: 1 } }), {
       voiceActive: true, currentLanguage: 'es', onLanguage: () => assert.fail('unsupported language'),

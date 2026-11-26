@@ -63,7 +63,7 @@ test('일본어·스페인어·태국어 선택은 12초를 적용하고 6~9초 
 });
 
 test('언어 미확인·누락·잘못된 값은 한국어 화면이어도 5초로 추측하지 않고 12초까지 기다린다', () => {
-  for (const language of [undefined, null, '', 'en', 0, {}]) {
+  for (const language of [undefined, null, '', 'fr', 0, {}]) {
     const { clock, events, wait } = setup(); wait.audio(silence(), language);
     clock.tick(9000); assert.equal(wait.waiting, true); assert(!events.some((event) => event?.deadline));
     clock.tick(3000); assert.equal(wait.expired, true); assert.equal(events.at(-1), 'timeout');
