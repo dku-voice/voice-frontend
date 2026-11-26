@@ -996,6 +996,7 @@ function App() {
       stopVoiceStreaming(false);
       retireVoiceSocket(wsRef.current);
     }
+    setPendingSauce(null);
     cancelCamera();
     setCompleteCountdown(0);
     setVoiceRecommendation(null);
