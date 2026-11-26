@@ -3,7 +3,7 @@ import './App.css';
 import { loadPaymentWidget } from '@tosspayments/payment-widget-sdk';
 import { apiClient } from './api/client.js';
 import { kioskApi } from './api/kiosk.js';
-import { normalizeMenus, groupMenus, createCartItem, addCartItem, getOptionGroups, orderStatusLabel, isPaidOrder, cartFingerprint } from './domain/kiosk.js';
+import { normalizeMenus, groupMenus, createCartItem, addCartItem, getOptionGroups, needsSauceChoice, orderStatusLabel, isPaidOrder, cartFingerprint } from './domain/kiosk.js';
 import { createCheckoutManager } from './domain/checkout.js';
 import { removePaidItemsFromCart } from './domain/cart-settlement.js';
 import { runtimeConfig } from './integration/runtime.js';
@@ -74,6 +74,7 @@ function App() {
   const [menuLoading, setMenuLoading] = useState(true);
   const [menuError, setMenuError] = useState('');
   const [optionSelections, setOptionSelections] = useState({});
+  const [pendingSauce, setPendingSauce] = useState(null);
   const [currentScreen, setCurrentScreen] = useState('menu');
   const currentScreenRef = useRef(currentScreen);
   currentScreenRef.current = currentScreen;
@@ -859,9 +860,11 @@ function App() {
       const menu = resolveMenu(candidate);
       if (!menu) throw new Error('주문할 메뉴를 서버 목록에서 확인할 수 없습니다.');
       const optionIds = Array.isArray(candidate.optionIds) ? candidate.optionIds : optionSelections[menu.menuId] || [];
-      const item = createCartItem(menu, optionIds, candidate.quantity ?? 1);
+      const quantity = candidate.quantity ?? (pendingSauce?.menuId === menu.menuId ? pendingSauce.quantity : 1);
+      const item = createCartItem(menu, optionIds, quantity);
       checkoutRef.current.clearPaid();
       setCart((prev) => addCartItem(prev, item));
+      if (pendingSauce?.menuId === menu.menuId) setPendingSauce(null);
       setError('');
       speak(`${item.name}을 장바구니에 담았습니다.`);
     } catch (failure) { setError(failure.message); }
@@ -871,14 +874,30 @@ function App() {
     if (paymentBusyRef.current) return;
     try {
       if (menuSourceRef.current !== 'server') throw new Error('서버 메뉴를 불러온 뒤 주문할 수 있습니다.');
-      const items = candidates.map((candidate) => {
+      const resolved = candidates.map((candidate) => {
         const menu = resolveMenu(candidate);
         if (!menu) throw new Error('주문할 메뉴를 서버 목록에서 확인할 수 없습니다.');
-        return createCartItem(menu, candidate.optionIds, candidate.quantity);
+        return { menu, candidate };
       });
-      checkoutRef.current.clearPaid();
-      setCart((previous) => items.reduce((next, item) => addCartItem(next, item), previous));
+      const missingSauce = resolved.find(({ menu, candidate }) => needsSauceChoice(menu, candidate.optionIds));
+      const items = resolved
+        .filter((entry) => entry !== missingSauce)
+        .map(({ menu, candidate }) => createCartItem(menu, candidate.optionIds, candidate.quantity));
+      if (items.length) {
+        checkoutRef.current.clearPaid();
+        setCart((previous) => items.reduce((next, item) => addCartItem(next, item), previous));
+      }
       setError('');
+      if (missingSauce) {
+        const { menu, candidate } = missingSauce;
+        setPendingSauce({ menuId: menu.menuId, quantity: candidate.quantity ?? 1 });
+        setOptionSelections((previous) => ({ ...previous, [menu.menuId]: [] }));
+        if (menu.categoryNameKo) setSelectedCategory(menu.categoryNameKo);
+        setCurrentScreen('menu');
+        const added = items.length ? `${items.map((item) => `${item.name} ${item.quantity}개`).join(', ')}를 장바구니에 담았습니다. ` : '';
+        speak(`${added}${menu.name}의 소스를 골라 주세요.`);
+        return;
+      }
       speak(`${items.map((item) => `${item.name} ${item.quantity}개`).join(', ')}를 장바구니에 담았습니다.`);
     } catch (failure) { setError(failure.message); }
   };
@@ -977,6 +996,7 @@ function App() {
       stopVoiceStreaming(false);
       retireVoiceSocket(wsRef.current);
     }
+    setPendingSauce(null);
     cancelCamera();
     setCompleteCountdown(0);
     setVoiceRecommendation(null);
@@ -1516,7 +1536,8 @@ function App() {
     if (!item.options?.length && !item.allergens?.length && !item.nutrient) return null;
     const groups = getOptionGroups(item);
     const selected = optionSelections[item.menuId] || [];
-    return <details className="menu-details">
+    const sauceMissing = pendingSauce?.menuId === item.menuId;
+    return <details className={`menu-details${sauceMissing ? ' sauce-missing' : ''}`} open={sauceMissing || undefined}>
       <summary>메뉴 정보 · 옵션</summary>
       {item.allergens?.length > 0 && <p>알레르기: {item.allergens.join(', ')}</p>}
       {item.nutrient && <p>열량 {item.nutrient.calories ?? '-'}kcal · 나트륨 {item.nutrient.sodium ?? '-'}mg · 단백질 {item.nutrient.protein ?? '-'}g</p>}
@@ -1685,6 +1706,7 @@ function App() {
               <div className="item-image">{renderMenuImage(item)}</div>
               <h3>{item.name}</h3>
               <p>{formatPrice(item.price)}{item.status === 'SOLD_OUT' && ' · 품절'}</p>
+              {getOptionGroups(item).sauces.length > 0 && <p className="sauce-note">소스 1개 선택 (어니언·치즈·칠리)</p>}
               {renderMenuOptions(item)}
               <button className="primary" disabled={menuSource !== 'server' || item.status !== 'ACTIVE' || checkoutBusy} onClick={() => addToCart(item)}>담기</button>
             </article>

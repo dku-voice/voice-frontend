@@ -2466,6 +2466,24 @@ export const messages = {
     "es": "Se ha añadido {name} al carrito.",
     "th": "เพิ่ม {name} ลงตะกร้าแล้ว"
   },
+  "{items}를 장바구니에 담았습니다. {name}의 소스를 골라 주세요.": {
+    "en": "Added {items} to your cart. Please choose a sauce for the {name}.",
+    "ja": "{items}をカートに追加しました。{name}のソースを選んでください。",
+    "es": "Se ha añadido al carrito: {items}. Elija una salsa para {name}.",
+    "th": "เพิ่ม {items} ลงตะกร้าแล้ว โปรดเลือกซอสสำหรับ{name}"
+  },
+  "{name}의 소스를 골라 주세요.": {
+    "en": "Please choose a sauce for the {name}.",
+    "ja": "{name}のソースを選んでください。",
+    "es": "Elija una salsa para {name}.",
+    "th": "โปรดเลือกซอสสำหรับ{name}"
+  },
+  "소스 1개 선택 (어니언·치즈·칠리)": {
+    "en": "Choose 1 sauce (onion, cheese, chili)",
+    "ja": "ソースを1つ選択（オニオン・チーズ・チリ）",
+    "es": "Elija una salsa (cebolla, queso, chili)",
+    "th": "เลือกซอส 1 อย่าง (หัวหอม ชีส ชิลลี่)"
+  },
   "{items}를 장바구니에 담았습니다.": {
     "en": "Added {items} to your cart.",
     "ja": "{items}をカートに追加しました。",

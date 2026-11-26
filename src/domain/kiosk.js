@@ -94,6 +94,13 @@ export const getOptionGroups = (menu) => {
   };
 };
 
+export const needsSauceChoice = (menu, optionIds = []) => {
+  const { sauces } = getOptionGroups(menu || {});
+  if (!sauces.length) return false;
+  const ids = Array.isArray(optionIds) ? optionIds : [];
+  return ids.filter((id) => sauces.some((sauce) => sauce.optionId === id)).length !== 1;
+};
+
 export const createCartItem = (menu, optionIds = [], quantity = 1) => {
   const menuId = menu?.menuId ?? menu?.id;
   if (!positiveInteger(menuId) || menu.status !== 'ACTIVE') throw new Error('현재 주문할 수 없는 메뉴입니다.');
