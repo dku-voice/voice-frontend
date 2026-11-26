@@ -2466,17 +2466,17 @@ export const messages = {
     "es": "Se ha añadido {name} al carrito.",
     "th": "เพิ่ม {name} ลงตะกร้าแล้ว"
   },
-  "{items}를 장바구니에 담았습니다. {name}의 소스를 골라 주세요.": {
-    "en": "Added {items} to your cart. Please choose a sauce for the {name}.",
-    "ja": "{items}をカートに追加しました。{name}のソースを選んでください。",
-    "es": "Se ha añadido al carrito: {items}. Elija una salsa para {name}.",
-    "th": "เพิ่ม {items} ลงตะกร้าแล้ว โปรดเลือกซอสสำหรับ{name}"
+  "{items}를 장바구니에 담았습니다. {name} 소스를 함께 다시 말씀해 주세요.": {
+    "en": "Added {items} to your cart. Please say your {name} order again with a sauce.",
+    "ja": "{items}をカートに追加しました。{name}はソースと一緒にもう一度お話しください。",
+    "es": "Se ha añadido al carrito: {items}. Repita el pedido de {name} indicando la salsa.",
+    "th": "เพิ่ม {items} ลงตะกร้าแล้ว โปรดพูดสั่ง{name}อีกครั้งพร้อมบอกซอส"
   },
-  "{name}의 소스를 골라 주세요.": {
-    "en": "Please choose a sauce for the {name}.",
-    "ja": "{name}のソースを選んでください。",
-    "es": "Elija una salsa para {name}.",
-    "th": "โปรดเลือกซอสสำหรับ{name}"
+  "{name} 소스를 함께 다시 말씀해 주세요.": {
+    "en": "Please say your {name} order again with a sauce.",
+    "ja": "{name}はソースと一緒にもう一度お話しください。",
+    "es": "Repita el pedido de {name} indicando la salsa.",
+    "th": "โปรดพูดสั่ง{name}อีกครั้งพร้อมบอกซอส"
   },
   "소스 1개 선택 (어니언·치즈·칠리)": {
     "en": "Choose 1 sauce (onion, cheese, chili)",
