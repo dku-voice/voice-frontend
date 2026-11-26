@@ -2490,6 +2490,24 @@ export const messages = {
     "es": "No se pudieron confirmar el menú, la cantidad o las opciones del pedido por voz.",
     "th": "ไม่สามารถยืนยันเมนู จำนวน หรือตัวเลือกของคำสั่งซื้อด้วยเสียงได้"
   },
+  "처음으로 돌아갈까요?": {
+    "en": "Go back to the start?",
+    "ja": "最初に戻りますか？",
+    "es": "¿Volver al inicio?",
+    "th": "กลับไปหน้าแรกไหม"
+  },
+  "장바구니에 담은 메뉴가 모두 지워져요.": {
+    "en": "All items in your cart will be removed.",
+    "ja": "カートの商品はすべて削除されます。",
+    "es": "Se eliminarán todos los productos del carrito.",
+    "th": "รายการในตะกร้าจะถูกลบทั้งหมด"
+  },
+  "계속 주문하기": {
+    "en": "Keep ordering",
+    "ja": "注文を続ける",
+    "es": "Seguir pidiendo",
+    "th": "สั่งต่อ"
+  },
   "지금 말씀하세요": {
     "en": "Speak now",
     "ja": "どうぞお話しください",

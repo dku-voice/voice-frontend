@@ -105,6 +105,7 @@ function App() {
   const [ageEstimate, setAgeEstimate] = useState(null);
   const [highContrast, setHighContrast] = useState(false);
   const [seniorDemo, setSeniorDemo] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [snapshotStatus, setSnapshotStatus] = useState('대기 중');
   const [paymentStatus, setPaymentStatus] = useState('결제 수단을 준비하고 있습니다.');
@@ -987,6 +988,17 @@ function App() {
     setKioskStage('welcome');
     setCurrentScreen('menu');
   };
+  const leaveToStart = () => {
+    if (paymentBusyRef.current) return;
+    setConfirmLeave(false);
+    setCart([]);
+    returnToWelcome();
+  };
+  const requestLeaveToStart = () => {
+    if (paymentBusyRef.current) return;
+    if (cartRef.current.length) setConfirmLeave(true);
+    else leaveToStart();
+  };
   const chooseTouchOrder = () => {
     cancelCamera();
     if (voiceStartingRef.current || voiceSessionRef.current || voiceWaitRef.current.active) {
@@ -1586,6 +1598,9 @@ function App() {
         <LanguageSelector language={language} onChange={selectLanguageManually} />
       </div>
       <nav className="nav-buttons" aria-label="화면 이동">
+        {kioskStage !== 'welcome' && currentScreen !== 'complete' && (
+          <button className="back-to-start" disabled={checkoutBusy} onClick={requestLeaveToStart}>처음으로</button>
+        )}
         {[
           ['menu', '메뉴'],
           ['recommendations', '추천'],
@@ -1950,6 +1965,14 @@ function App() {
     <div lang={language} className={`App ${highContrast ? 'high-contrast' : ''}`}>
       {renderTopBar()}
       {renderSystemPanel()}
+      {confirmLeave && <section className="senior-dialog leave-dialog" role="dialog" aria-modal="true" aria-labelledby="leave-dialog-title">
+        <h2 id="leave-dialog-title">처음으로 돌아갈까요?</h2>
+        <p>장바구니에 담은 메뉴가 모두 지워져요.</p>
+        <div className="action-row">
+          <button className="primary" onClick={leaveToStart}>처음으로</button>
+          <button onClick={() => setConfirmLeave(false)}>계속 주문하기</button>
+        </div>
+      </section>}
       {cameraProcessing && <div className="loading">처리 중...</div>}
       {aiResponsePending && (
         <div className="loading ai-pending" role="status" aria-live="polite">
