@@ -630,3 +630,15 @@ summary { cursor: pointer; }
   background: #fff;
   text-align: center;
 }
+
+.sauce-note {
+  margin: 0;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.menu-details.sauce-missing {
+  outline: 3px solid #f59e0b;
+  border-radius: 8px;
+}
