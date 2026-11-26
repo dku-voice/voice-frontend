@@ -2,6 +2,7 @@ import { messages } from './messages.js';
 
 export const languages = [
   { code: 'ko', label: '한국어', locale: 'ko-KR' },
+  { code: 'en', label: 'English', locale: 'en-US' },
   { code: 'ja', label: '日本語', locale: 'ja-JP' },
   { code: 'es', label: 'Español', locale: 'es-ES' },
   { code: 'th', label: 'ไทย', locale: 'th-TH' },
