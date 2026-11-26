@@ -620,3 +620,12 @@ summary { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .listen-cue.live { animation: none; }
 }
+
+.back-to-start {
+  font-weight: 700;
+}
+.leave-dialog {
+  margin: 16px auto;
+  background: #fff;
+  text-align: center;
+}
